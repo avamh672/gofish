@@ -1,0 +1,19 @@
+2023-05-05 09:11:33,007 - pyswarms.backend.generators - ERROR - Bounds and/or init_pos should be of size (37,)
+Traceback (most recent call last):
+  File "/mnt/home/hillma54/mambaforge/lib/python3.10/site-packages/pyswarms/backend/generators.py", line 81, in generate_swarm
+    pos = center * np.random.uniform(
+  File "mtrand.pyx", line 1154, in numpy.random.mtrand.RandomState.uniform
+  File "_common.pyx", line 600, in numpy.random._common.cont
+  File "_common.pyx", line 517, in numpy.random._common.cont_broadcast_2
+  File "__init__.pxd", line 741, in numpy.PyArray_MultiIterNew3
+ValueError: shape mismatch: objects cannot be broadcast to a single shape.  Mismatch is between arg 0 with shape (350, 37) and arg 1 with shape (350, 35).
+2023-05-11 13:18:19,467 - numexpr.utils - INFO - Note: NumExpr detected 32 cores but "NUMEXPR_MAX_THREADS" not set, so enforcing safe limit of 8.
+2023-05-11 13:18:19,468 - numexpr.utils - INFO - NumExpr defaulting to 8 threads.
+2023-05-11 13:18:48,789 - numexpr.utils - INFO - Note: NumExpr detected 32 cores but "NUMEXPR_MAX_THREADS" not set, so enforcing safe limit of 8.
+2023-05-11 13:18:48,790 - numexpr.utils - INFO - NumExpr defaulting to 8 threads.
+2023-05-11 13:19:31,147 - numexpr.utils - INFO - Note: NumExpr detected 32 cores but "NUMEXPR_MAX_THREADS" not set, so enforcing safe limit of 8.
+2023-05-11 13:19:31,147 - numexpr.utils - INFO - NumExpr defaulting to 8 threads.
+2023-05-11 13:21:06,004 - numexpr.utils - INFO - Note: NumExpr detected 32 cores but "NUMEXPR_MAX_THREADS" not set, so enforcing safe limit of 8.
+2023-05-11 13:21:06,004 - numexpr.utils - INFO - NumExpr defaulting to 8 threads.
+2023-05-11 13:22:39,778 - numexpr.utils - INFO - Note: NumExpr detected 32 cores but "NUMEXPR_MAX_THREADS" not set, so enforcing safe limit of 8.
+2023-05-11 13:22:39,778 - numexpr.utils - INFO - NumExpr defaulting to 8 threads.
