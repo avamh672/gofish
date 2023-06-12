@@ -29,17 +29,17 @@ def runMonteCarloSpace(chainNum,chainDir,mainDir,nSamples,beamLoBounds,beamHiBou
     runGosia.runGosia2(targetINTIinp)
     runGosia.runGosia(beamMAPinp)
     runGosia.runGosia(targetMAPinp)
-    runGosia.runGosia2(beamPOINinp)
-    beamPOINout = parseGosiaInputs.getOutputFile(beamPOINinp)
-    targetPOINout = parseGosiaInputs.getOutputFile(targetPOINinp)
-    beam_dof = parseGosiaInputs.findDof(beamPOINinp,beamYields)
-    target_dof = parseGosiaInputs.findDof(targetPOINinp,targetYields)
+    runGosia.runGosia2(beamMINIinp)
+    beamMINIout = parseGosiaInputs.getOutputFile(beamMINIinp)
+    targetMINIout = parseGosiaInputs.getOutputFile(targetMINIinp)
+    beam_dof = parseGosiaInputs.findDof(beamMINIinp,beamYields)
+    target_dof = parseGosiaInputs.findDof(targetMINIinp,targetYields)
     total_dof = beam_dof + target_dof
     #outputsSubSpace = np.zeros((total_dof+1))
-    chisqContributions = parseGosiaInputs.findChisqContributions(beamPOINout)
-    chisqContributions += parseGosiaInputs.findChisqContributions(targetPOINout)
-    beamChisq = parseGosiaInputs.findChisq(beamPOINout)*beam_dof
-    targetChisq = parseGosiaInputs.findChisq(targetPOINout)*target_dof
+    chisqContributions = parseGosiaInputs.findChisqContributions(beamMINIout)
+    chisqContributions += parseGosiaInputs.findChisqContributions(targetMINIout)
+    beamChisq = parseGosiaInputs.findChisq(beamMINIout)*beam_dof
+    targetChisq = parseGosiaInputs.findChisq(targetMINIout)*target_dof
     totalChisq = beamChisq + targetChisq
     chisqContributions.append(totalChisq)
     outputsSubSpace = chisqContributions
@@ -86,16 +86,16 @@ def runMonteCarloSpace(chainNum,chainDir,mainDir,nSamples,beamLoBounds,beamHiBou
     runGosia.runGosia2(targetINTIinp)
     runGosia.runGosia(beamMAPinp)
     runGosia.runGosia(targetMAPinp)
-    runGosia.runGosia2(beamPOINinp)
-    beamPOINout = parseGosiaInputs.getOutputFile(beamPOINinp)
-    targetPOINout = parseGosiaInputs.getOutputFile(targetPOINinp)
-    beam_dof = parseGosiaInputs.findDof(beamPOINinp,beamYields)
-    target_dof = parseGosiaInputs.findDof(targetPOINinp,targetYields)
+    runGosia.runGosia2(beamMINIinp)
+    beamMINIout = parseGosiaInputs.getOutputFile(beamMINIinp)
+    targetMINIout = parseGosiaInputs.getOutputFile(targetMINIinp)
+    beam_dof = parseGosiaInputs.findDof(beamMINIinp,beamYields)
+    target_dof = parseGosiaInputs.findDof(targetMINIinp,targetYields)
     total_dof = beam_dof + target_dof
-    chisqContributions = parseGosiaInputs.findChisqContributions(beamPOINout)
-    chisqContributions += parseGosiaInputs.findChisqContributions(targetPOINout)
-    beamChisq = parseGosiaInputs.findChisq(beamPOINout)*beam_dof
-    targetChisq = parseGosiaInputs.findChisq(targetPOINout)*target_dof
+    chisqContributions = parseGosiaInputs.findChisqContributions(beamMINIout)
+    chisqContributions += parseGosiaInputs.findChisqContributions(targetMINIout)
+    beamChisq = parseGosiaInputs.findChisq(beamMINIout)*beam_dof
+    targetChisq = parseGosiaInputs.findChisq(targetMINIout)*target_dof
     totalChisq = beamChisq + targetChisq
     chisqContributions.append(totalChisq)
     beamInputs = open(os.path.join(mainDir,"beamInputs_" + str(chainNum) + ".csv"),'a')
@@ -132,8 +132,8 @@ def runMonteCarloSpace(chainNum,chainDir,mainDir,nSamples,beamLoBounds,beamHiBou
 def generateMonteCarloSpace(beamMatrixElements,targetMatrixElements,chainNum,nSamples=2,initialGuess = False): #Markov Chain Monte Carlo method to sample the parameter space
   #First we define matrices to store the successive sets of ME's
   
-  beam_dof = parseGosiaInputs.findDof(beamPOINinp,beamYields)
-  target_dof = parseGosiaInputs.findDof(targetPOINinp,targetYields)
+  beam_dof = parseGosiaInputs.findDof(beamMINIinp,beamYields)
+  target_dof = parseGosiaInputs.findDof(targetMINIinp,targetYields)
   total_dof = beam_dof + target_dof
   chainDirPrefix = fileManagement.createSubDirectories(chainNum)
   chainDir = chainDirPrefix + str(chainNum)
@@ -190,4 +190,8 @@ def generateMonteCarloSpace(beamMatrixElements,targetMatrixElements,chainNum,nSa
 
 chainNum = int(sys.argv[1])
 beamMatrixElements,targetMatrixElements = setup()
-generateMonteCarloSpace(beamMatrixElements,targetMatrixElements,chainNum,nSamples=100,initialGuess = True)
+if batchNumber = 0:
+  initialGuess = True
+else:
+  initialGuess = False
+generateMonteCarloSpace(beamMatrixElements,targetMatrixElements,chainNum,nSamples=100,initialGuess = initialGuess)

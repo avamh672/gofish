@@ -55,6 +55,7 @@ import runGosia
 from pyswarms.backend.topology import Ring
 from pyswarms.backend.topology import Star
 from pyswarms.backend.handlers import VelocityHandler
+from pyswarms.backend.handlers import BoundaryHandler
 from myconfig import *
 import threading
 import fileManagement
@@ -99,19 +100,14 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
   for i in range(threadFirstLast[0],threadFirstLast[1]):
     parseGosiaInputs.make_bst(os.path.join(chainDir,beam_bst),positions[i][:nBeamParams])
     parseGosiaInputs.make_bst(os.path.join(chainDir,target_bst),positions[i][nBeamParams:])
-    #if iteration % 20 == 0:
-      #runGosia.runGosia2InDir(beamINTIinp,chainDir)
-      #runGosia.runGosia2InDir(targetINTIinp,chainDir)
-      #runGosia.runGosiaInDir(beamMAPinp,chainDir)
-      #runGosia.runGosiaInDir(targetMAPinp,chainDir)
-    runGosia.runGosiaInDir(beamPOINinp,chainDir)
-    runGosia.runGosiaInDir(targetPOINinp,chainDir)
-    beamOutputFile = os.path.join(chainDir,parseGosiaInputs.getOutputFile(beamPOINinp))
-    targetOutputFile = os.path.join(chainDir,parseGosiaInputs.getOutputFile(targetPOINinp))
+    runGosia.runGosiaInDir(beamMINIinp,chainDir)
+    runGosia.runGosiaInDir(targetMINIinp,chainDir)
+    beamOutputFile = os.path.join(chainDir,parseGosiaInputs.getOutputFile(beamMINIinp))
+    targetOutputFile = os.path.join(chainDir,parseGosiaInputs.getOutputFile(targetMINIinp))
     beamINTIout = os.path.join(chainDir,parseGosiaInputs.getOutputFile(beamINTIinp))
     targetINTIout = os.path.join(chainDir,parseGosiaInputs.getOutputFile(targetINTIinp))
-    beamCorrFile = os.path.join(chainDir,parseGosiaInputs.getCorrFile(beamPOINinp))
-    targetCorrFile = os.path.join(chainDir,parseGosiaInputs.getCorrFile(targetPOINinp))
+    beamCorrFile = os.path.join(chainDir,parseGosiaInputs.getCorrFile(beamMINIinp))
+    targetCorrFile = os.path.join(chainDir,parseGosiaInputs.getCorrFile(targetMINIinp))
     computedObservables = parseGosiaInputs.getPOINobservables(beamOutputFile)
     computedObservables += parseGosiaInputs.getPOINobservables(targetOutputFile)
     expt = []
@@ -149,13 +145,18 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
   return 
 
 #Initializes everything
-nThreads = 4 #number of threads used for particles
-nBeamParams = 17 #number of matrix elements for the sn112 beam
+nThreads = 20 #number of threads used for particles
+#nBeamParams = 17 #number of matrix elements for the sn112 beam
 #nBeamParams = 13 #sn116, sn120
-nParticles = 350 #number of particles to be used
-nDimensions = 41 #total number of parameters for sn112
-#nDimensions = 35 #sn120
+nBeamParams = 19 #ge80
+#nDimensions = 41 #total number of parameters for sn112
+#nDimensions = 36 #sn120
 #nDimensions = 37 #sn116
+nDimensions = 44 #ge80
+nParticles = 600
+cognitiveCoeff = 1.75
+socialCoeff = 1.0
+inertialCoeff = 0.7
 
 #Gets the bounds for each matrix element from the INTI files.
 beamMatrixElements = parseGosiaInputs.getMatrixElements(beamINTIinp)
@@ -179,8 +180,8 @@ beamCorr = parseGosiaInputs.getCorrFile(beamINTIinp)
 targetCorr = parseGosiaInputs.getCorrFile(targetINTIinp)
 
 #Get experimental observables and the beam and target maps
-observables,uncertainties,beamExptMap,targetExptMap = parseGosiaInputs.getExperimentalObservables(beamYields,targetYields,beamCorr,targetCorr,beamPOINinp,targetPOINinp)
-exptUpperLimits = parseGosiaInputs.getUpperLimits(beamPOINinp,targetPOINinp,beamExptMap,targetExptMap,observables)
+observables,uncertainties,beamExptMap,targetExptMap = parseGosiaInputs.getExperimentalObservables(beamYields,targetYields,beamCorr,targetCorr,beamMINIinp,targetMINIinp)
+exptUpperLimits = parseGosiaInputs.getUpperLimits(beamMINIinp,targetMINIinp,beamExptMap,targetExptMap,observables)
 
 #Initialize the particle swarm
 #Papers I read suggested that VonNeumann is typically the best topology. With this many 
@@ -190,17 +191,26 @@ exptUpperLimits = parseGosiaInputs.getUpperLimits(beamPOINinp,targetPOINinp,beam
 #space near where they start and prevents premature convergence to a local minimum.
 my_topology = Ring(static=False) 
 #Next line only needed if running Ring topology
-my_vh = VelocityHandler(strategy='invert') 
+velocityHandler = VelocityHandler(strategy='invert')
+#BoundaryHandler
+boundaryHandler = BoundaryHandler(strategy='reflective')
+#boundaryHandler = BoundaryHandler(strategy='intermediate')
+#boundaryHandler = BoundaryHandler(strategy='random')
+#boundaryHandler = BoundaryHandler(strategy='shrink')
+
 #c1 is the cognitive parameter (velocity component towards particle's own best position)
 #c2 is the social parameter (velocity component towards best position of particle it can see)
 #c2 pulls towards global minimum in star topology since the graph is fully connected
 #w is the inertial parameter (velocity component in direction of last iteration's velocity)
-my_options = {'c1' : 1.6, 'c2' : 1.3, 'w' : 0.4}
+my_options = {'c1' : cognitiveCoeff, 'c2' : socialCoeff, 'w' : inertialCoeff}
 my_swarm = P.create_swarm(n_particles=nParticles,dimensions=nDimensions,bounds=paramBounds,options=my_options)
 
 iterSwitch = 350
 neighborsArray = [20,30,40,60,80,120,160]
 
+#bestParams = parseGosiaInputs.read_bst(beam_bst)
+#bestParams += parseGosiaInputs.read_bst(target_bst)
+#my_swarm.position[0,:] = bestParams
 iterations = 500
 for i in range(iterations):
   if i == iterSwitch:
@@ -238,11 +248,11 @@ for i in range(iterations):
   
   #Update velocities and positions for the next iteration
   if i < iterSwitch:
-    my_swarm.velocity = my_topology.compute_velocity(my_swarm,clamp=None,vh=my_vh,bounds=(loBounds,hiBounds))
-    my_swarm.position = my_topology.compute_position(my_swarm,bounds=paramBounds)
+    my_swarm.velocity = my_topology.compute_velocity(my_swarm,clamp=None,vh=velocityHandler,bounds=(loBounds,hiBounds))
+    my_swarm.position = my_topology.compute_position(my_swarm,bounds=paramBounds,bh=boundaryHandler)
   else:
     my_swarm.velocity = my_topology.compute_velocity(my_swarm)
-    my_swarm.position = my_topology.compute_position(my_swarm)
+    my_swarm.position = my_topology.compute_position(my_swarm,bounds=paramBounds,bh=boundaryHandler)
 
 f = open('adaptiveParticleSwarmResult_%i.csv' % batchNumber,'w')
 f.write('The best cost found by our swarm is: {:.4f}\n'.format(my_swarm.best_cost))

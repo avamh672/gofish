@@ -5,8 +5,8 @@ import numpy as np
 
 #Initializes the program by reading in the matrix elements and their properties
 def setup(): 
-  beamMatrixElements = getMatrixElements(beamPOINinp)
-  targetMatrixElements = getMatrixElements(targetPOINinp)
+  beamMatrixElements = getMatrixElements(beamMINIinp)
+  targetMatrixElements = getMatrixElements(targetMINIinp)
   return beamMatrixElements,targetMatrixElements
 
 #Gets the output file from a given input file
@@ -203,11 +203,11 @@ def findChisqContributions(output_file):
   return sigmas
 
 #Gets the relevant observables from the experiment (corrected yields and comparisons to literature)
-#Requires corrected yields and POIN input for both beam and target
+#Requires corrected yields and MINI input for both beam and target
 #ExptMaps store the experiment number and initial and final states for each observables as a tuple.
 #Observables that are literature constraints and not yeilds have map values of (0,0,0). This is
 #so the code knows to bypass them when applying scaling factors.
-def getExperimentalObservables(beamYields,targetYields,beamCorr,targetCorr,beamPOINinp,targetPOINinp):
+def getExperimentalObservables(beamYields,targetYields,beamCorr,targetCorr,beamMINIinp,targetMINIinp):
   
   observables = []
   uncertainties = []
@@ -245,8 +245,8 @@ def getExperimentalObservables(beamYields,targetYields,beamCorr,targetCorr,beamP
     line = f.readline()
   f.close()
 
-  #Read the literature constraints from the POIN file. Note that there are comments that must be included in the POIN file for this to work properly.
-  f = open(beamPOINinp,'r')
+  #Read the literature constraints from the MINI file. Note that there are comments that must be included in the MINI file for this to work properly.
+  f = open(beamMINIinp,'r')
   line = f.readline()
   while line:
     if "!BR" in line: #Put !BR as a comment on the line where the number of branching ratio constraints is defined
@@ -316,7 +316,7 @@ def getExperimentalObservables(beamYields,targetYields,beamCorr,targetCorr,beamP
 
   lifetimes = []
   lifetime_uncs = []
-  f = open(targetPOINinp,'r')
+  f = open(targetMINIinp,'r')
   line = f.readline()
   while line:
     if "!BR" in line:
@@ -379,7 +379,13 @@ def getPOINobservables(output_file):
         init = int(splitline[0])
         final = int(splitline[1])
         #if(expt,init,final) in exptMap or (expt,final,init) in exptMap:
-        computedObservables.append(float(splitline[4]))
+        #GOSIA removes the E from scientific notation if the exponent is 3 digits. Added this try-except block to account for that.
+        try:
+          computedObservables.append(float(splitline[4]))
+        except:
+          splitagain = splitline[4].split('+')
+          withE = splitagain[0] + "E+" + splitagain[1]
+          computedObservables.append(float(withE))
         line = f.readline()
     if "EXP. AND CALCULATED BRANCHING RATIOS" in line:
       for i in range(5):
@@ -433,10 +439,10 @@ def getCorr(output_file):
     line = f.readline()
   return corrections
 
-def getUpperLimits(beamPOINinp,targetPOINinp,beamExptMap,targetExptMap,observables):
+def getUpperLimits(beamMINIinp,targetMINIinp,beamExptMap,targetExptMap,observables):
   beamUpperLimits = []
   
-  f = open(beamPOINinp,'r')
+  f = open(beamMINIinp,'r')
   line = f.readline()
   while line:
     if '!YNRM' in line:
@@ -455,7 +461,7 @@ def getUpperLimits(beamPOINinp,targetPOINinp,beamExptMap,targetExptMap,observabl
   
   targetUpperLimits = []
 
-  f = open(targetPOINinp,'r')
+  f = open(targetMINIinp,'r')
   line = f.readline()
   while line:
     if '!YNRM' in line:
