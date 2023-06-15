@@ -1,12 +1,12 @@
 import sys
-from myconfig import *
 import pandas as pd
 import numpy as np
-
+import os
+  
 #Initializes the program by reading in the matrix elements and their properties
 def setup(): 
-  beamMatrixElements = getMatrixElements(beamMINIinp)
-  targetMatrixElements = getMatrixElements(targetMINIinp)
+  beamMatrixElements = getMatrixElements(beamPOINinp)
+  targetMatrixElements = getMatrixElements(targetPOINinp)
   return beamMatrixElements,targetMatrixElements
 
 #Gets the output file from a given input file
@@ -122,7 +122,7 @@ def read_bst(bst_file):
     line = f.readline()
   f.close()
   return mes
-  
+
 def findChisqContributions(output_file):
   f = open(output_file,'r')
   line = f.readline()
@@ -203,12 +203,12 @@ def findChisqContributions(output_file):
   return sigmas
 
 #Gets the relevant observables from the experiment (corrected yields and comparisons to literature)
-#Requires corrected yields and MINI input for both beam and target
+#Requires corrected yields and POIN input for both beam and target
 #ExptMaps store the experiment number and initial and final states for each observables as a tuple.
 #Observables that are literature constraints and not yeilds have map values of (0,0,0). This is
 #so the code knows to bypass them when applying scaling factors.
-def getExperimentalObservables(beamYields,targetYields,beamCorr,targetCorr,beamMINIinp,targetMINIinp):
-  
+def getExperimentalObservables(beamYields,targetYields,beamCorr,targetCorr,beamPOINinp,targetPOINinp):
+
   observables = []
   uncertainties = []
   beamExptMap = []
@@ -245,8 +245,8 @@ def getExperimentalObservables(beamYields,targetYields,beamCorr,targetCorr,beamM
     line = f.readline()
   f.close()
 
-  #Read the literature constraints from the MINI file. Note that there are comments that must be included in the MINI file for this to work properly.
-  f = open(beamMINIinp,'r')
+  #Read the literature constraints from the POIN file. Note that there are comments that must be included in the POIN file for this to work properly.
+  f = open(beamPOINinp,'r')
   line = f.readline()
   while line:
     if "!BR" in line: #Put !BR as a comment on the line where the number of branching ratio constraints is defined
@@ -316,7 +316,7 @@ def getExperimentalObservables(beamYields,targetYields,beamCorr,targetCorr,beamM
 
   lifetimes = []
   lifetime_uncs = []
-  f = open(targetMINIinp,'r')
+  f = open(targetPOINinp,'r')
   line = f.readline()
   while line:
     if "!BR" in line:
@@ -439,10 +439,10 @@ def getCorr(output_file):
     line = f.readline()
   return corrections
 
-def getUpperLimits(beamMINIinp,targetMINIinp,beamExptMap,targetExptMap,observables):
+def getUpperLimits(beamPOINinp,targetPOINinp,beamExptMap,targetExptMap,observables):
   beamUpperLimits = []
   
-  f = open(beamMINIinp,'r')
+  f = open(beamPOINinp,'r')
   line = f.readline()
   while line:
     if '!YNRM' in line:
@@ -461,7 +461,7 @@ def getUpperLimits(beamMINIinp,targetMINIinp,beamExptMap,targetExptMap,observabl
   
   targetUpperLimits = []
 
-  f = open(targetMINIinp,'r')
+  f = open(targetPOINinp,'r')
   line = f.readline()
   while line:
     if '!YNRM' in line:

@@ -3,7 +3,8 @@ import shutil
 from myconfig import *
 
 def createSubDirectories(chainNum):
-  chainDirPrefix = os.path.join("/mnt/scratch/hillma54","chainSubdir_")
+  #chainDirPrefix = os.path.join("/mnt/scratch/hillma54","chainSubdir_")
+  chainDirPrefix = os.path.join("./","chainSubdir_")
   chainDir = chainDirPrefix + str(chainNum)
   fullPathToChainDir = os.path.join(os.getcwd(),chainDir)
   #if os.path.exists(fullPathToChainDir):
@@ -14,12 +15,20 @@ def createSubDirectories(chainNum):
   shutil.copy("sega.gdt",chainDir)
   shutil.copy(beamINTIinp,chainDir)
   shutil.copy(beamMAPinp,chainDir)
-  shutil.copy(beamMINIinp,chainDir)
+  shutil.copy(beamPOINinp,chainDir)
   shutil.copy(targetINTIinp,chainDir)
   shutil.copy(targetMAPinp,chainDir)
-  shutil.copy(targetMINIinp,chainDir)
+  shutil.copy(targetPOINinp,chainDir)
   shutil.copy(rawBeamYields,chainDir)
   shutil.copy(rawTargetYields,chainDir)
   shutil.copy(beam_bst,chainDir)
   shutil.copy(target_bst,chainDir)
   return chainDirPrefix
+
+def removeSubDirectories(chainNum):
+  #chainDirPrefix = os.path.join("/mnt/scratch/hillma54","chainSubdir_")
+  chainDirPrefix = os.path.join("./","chainSubdir_")
+  chainDir = chainDirPrefix + str(chainNum)
+  fullPathToChainDir = os.path.join(os.getcwd(),chainDir)
+  shutil.rmtree(fullPathToChainDir) 
+  return

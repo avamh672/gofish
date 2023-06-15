@@ -24,7 +24,7 @@ class gosiaManager:
     else:
       raise Exception("ERROR: Config file is not readable!")
 
-    expectedFromConfig = ["gosia","gosia2","beamINTIinp","beamMAPinp","beamPOINinp","targetINTIinp","targetMAPinp","targetPOINinp","beam_bst","target_bst","beamYields","targetYields","rawBeamYields","rawTargetYields","nThreads","nBeamParams","nTargetParams"]
+    expectedFromConfig = ["gosia","gosia2","beamINTIinp","beamMAPinp","beamPOINinp","targetINTIinp","targetMAPinp","targetPOINinp","beam_bst","target_bst","beamYields","targetYields","rawBeamYields","rawTargetYields","scratchDirectory","nThreads","nBeamParams","nTargetParams"]
     for key in expectedFromConfig:
       if key not in self.configDict.keys():
         raise Exception("ERROR: Variable %s not in config file!" % key)
@@ -518,12 +518,9 @@ class gosiaManager:
     return upperLimits
 
   def createSubDirectories(self,chainNum):
-    #chainDirPrefix = os.path.join("/mnt/scratch/hillma54","chainSubdir_")
-    chainDirPrefix = os.path.join("./","chainSubdir_")
+    chainDirPrefix = os.path.join(self.configDict["scratchDirectory"],"chainSubdir_")
     chainDir = chainDirPrefix + str(chainNum)
     fullPathToChainDir = os.path.join(os.getcwd(),chainDir)
-    #if os.path.exists(fullPathToChainDir):
-      #shutil.rmtree(chainDir)
     if not os.path.exists(fullPathToChainDir):
       os.mkdir(chainDir)
     shutil.copy("sega.raw",chainDir)
@@ -541,8 +538,7 @@ class gosiaManager:
     return chainDirPrefix
 
   def removeSubDirectories(self,chainNum):
-    #chainDirPrefix = os.path.join("/mnt/scratch/hillma54","chainSubdir_")
-    chainDirPrefix = os.path.join("./","chainSubdir_")
+    chainDirPrefix = os.path.join(self.configDict["scratchDirectory"],"chainSubdir_")
     chainDir = chainDirPrefix + str(chainNum)
     fullPathToChainDir = os.path.join(os.getcwd(),chainDir)
     shutil.rmtree(fullPathToChainDir) 

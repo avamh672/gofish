@@ -100,14 +100,14 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
   for i in range(threadFirstLast[0],threadFirstLast[1]):
     parseGosiaInputs.make_bst(os.path.join(chainDir,beam_bst),positions[i][:nBeamParams])
     parseGosiaInputs.make_bst(os.path.join(chainDir,target_bst),positions[i][nBeamParams:])
-    runGosia.runGosiaInDir(beamMINIinp,chainDir)
-    runGosia.runGosiaInDir(targetMINIinp,chainDir)
-    beamOutputFile = os.path.join(chainDir,parseGosiaInputs.getOutputFile(beamMINIinp))
-    targetOutputFile = os.path.join(chainDir,parseGosiaInputs.getOutputFile(targetMINIinp))
+    runGosia.runGosiaInDir(beamPOINinp,chainDir)
+    runGosia.runGosiaInDir(targetPOINinp,chainDir)
+    beamOutputFile = os.path.join(chainDir,parseGosiaInputs.getOutputFile(beamPOINinp))
+    targetOutputFile = os.path.join(chainDir,parseGosiaInputs.getOutputFile(targetPOINinp))
     beamINTIout = os.path.join(chainDir,parseGosiaInputs.getOutputFile(beamINTIinp))
     targetINTIout = os.path.join(chainDir,parseGosiaInputs.getOutputFile(targetINTIinp))
-    beamCorrFile = os.path.join(chainDir,parseGosiaInputs.getCorrFile(beamMINIinp))
-    targetCorrFile = os.path.join(chainDir,parseGosiaInputs.getCorrFile(targetMINIinp))
+    beamCorrFile = os.path.join(chainDir,parseGosiaInputs.getCorrFile(beamPOINinp))
+    targetCorrFile = os.path.join(chainDir,parseGosiaInputs.getCorrFile(targetPOINinp))
     computedObservables = parseGosiaInputs.getPOINobservables(beamOutputFile)
     computedObservables += parseGosiaInputs.getPOINobservables(targetOutputFile)
     expt = []
@@ -146,13 +146,13 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
 
 #Initializes everything
 nThreads = 20 #number of threads used for particles
-#nBeamParams = 17 #number of matrix elements for the sn112 beam
+nBeamParams = 17 #number of matrix elements for the sn112 beam
 #nBeamParams = 13 #sn116, sn120
-nBeamParams = 19 #ge80
-#nDimensions = 41 #total number of parameters for sn112
+#nBeamParams = 19 #ge80
+nDimensions = 41 #total number of parameters for sn112
 #nDimensions = 36 #sn120
 #nDimensions = 37 #sn116
-nDimensions = 44 #ge80
+#nDimensions = 44 #ge80
 nParticles = 600
 cognitiveCoeff = 1.75
 socialCoeff = 1.0
@@ -180,8 +180,8 @@ beamCorr = parseGosiaInputs.getCorrFile(beamINTIinp)
 targetCorr = parseGosiaInputs.getCorrFile(targetINTIinp)
 
 #Get experimental observables and the beam and target maps
-observables,uncertainties,beamExptMap,targetExptMap = parseGosiaInputs.getExperimentalObservables(beamYields,targetYields,beamCorr,targetCorr,beamMINIinp,targetMINIinp)
-exptUpperLimits = parseGosiaInputs.getUpperLimits(beamMINIinp,targetMINIinp,beamExptMap,targetExptMap,observables)
+observables,uncertainties,beamExptMap,targetExptMap = parseGosiaInputs.getExperimentalObservables(beamYields,targetYields,beamCorr,targetCorr,beamPOINinp,targetPOINinp)
+exptUpperLimits = parseGosiaInputs.getUpperLimits(beamPOINinp,targetPOINinp,beamExptMap,targetExptMap,observables)
 
 #Initialize the particle swarm
 #Papers I read suggested that VonNeumann is typically the best topology. With this many 

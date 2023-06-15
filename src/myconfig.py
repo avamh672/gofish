@@ -12,3 +12,7 @@ beamYields = "sn112yields.yld"
 targetYields = "pt196yields.yld"
 rawBeamYields = "sn112.yld"
 rawTargetYields = "pt196.yld"
+scratchDirectory = "./"
+nThreads = 20
+nBeamParams = 17
+nTargetParams = 24
