@@ -12,11 +12,14 @@ class gosiaManager:
       f = open(config,'r')
       self.configDict = {}
       integerArguments = ["nThreads","nBeamParams","nTargetParams"]
+      booleanArguments = ["simulMin"]
       line = f.readline()
       while line:
         splitline = line.split('=')
         if splitline[0].strip() in integerArguments:
           self.configDict[splitline[0].strip()] = int(splitline[1].strip())
+        elif splitline[0].strip() in booleanArguments:
+          self.configDict[splitline[0].strip()] = bool(splitline[1].strip())
         else:
           self.configDict[splitline[0].strip()] = splitline[1].strip()
         line = f.readline()
@@ -24,7 +27,12 @@ class gosiaManager:
     else:
       raise Exception("ERROR: Config file is not readable!")
 
-    expectedFromConfig = ["gosia","gosia2","beamINTIinp","beamMAPinp","beamPOINinp","targetINTIinp","targetMAPinp","targetPOINinp","beam_bst","target_bst","beamYields","targetYields","rawBeamYields","rawTargetYields","scratchDirectory","nThreads","nBeamParams","nTargetParams"]
+    expectedFromConfig = ["gosia","gosia2","beamINTIinp","beamMAPinp","beamPOINinp","beam_bst","beamYields","rawBeamYields","scratchDirectory","simulMin","nThreads","nBeamParams"]
+    if "simulMin" in self.configDict.keys():
+      if self.configDict["simulMin"] == True:
+        expectedFromConfig += ["targetINTIinp","targetMAPinp","targetPOINinp","target_bst","targetYields","rawTargetYields","nTargetParams"]
+      else:
+        raise Exception("ERROR: Variable simulMin not in config file! Please set to true for simultaneous beam/target minimization and false otherwise.")
     for key in expectedFromConfig:
       if key not in self.configDict.keys():
         raise Exception("ERROR: Variable %s not in config file!" % key)
@@ -316,82 +324,83 @@ class gosiaManager:
       line = f.readline()
     f.close()
     
-    #Do the same thing but for the target
-    f = open(self.configDict["targetYields"],'r')
-    line = f.readline()
-    while line:
-      splitline = line.split(",")
-      if len(splitline) == 7:
-        expt = int(splitline[0])
-      elif len(splitline) == 4:
-        targetExptMap.append((expt,int(splitline[0]),int(splitline[1])))
-        observables.append(float(splitline[2]))
-        uncertainties.append(float(splitline[3]))
+    #Do the same thing but for the target if simulMin is true
+    if self.configDict["simulMin"] == True:
+      f = open(self.configDict["targetYields"],'r')
       line = f.readline()
-    f.close()
-
-    targetCorr = self.getCorrFile(self.configDict["targetINTIinp"])
-
-    f = open(targetCorr,'r')
-    line = f.readline()
-    while line:
-      splitline = line.split()
-      if len(splitline) == 7:
-        expt = int(splitline[0])
-      elif len(splitline) == 4:
-        if (expt,int(splitline[0]),int(splitline[1])) in targetExptMap:
-          observables[len(beamExptMap) + targetExptMap.index((expt,int(splitline[0]),int(splitline[1])))] = float(splitline[2])
-          uncertainties[len(beamExptMap) + targetExptMap.index((expt,int(splitline[0]),int(splitline[1])))] = float(splitline[3])
-        elif (expt,int(splitline[1]),int(splitline[0])) in targetExptMap:
-          observables[len(beamExptMap) + targetExptMap.index((expt,int(splitline[1]),int(splitline[0])))] = float(splitline[2])
-          uncertainties[len(beamExptMap) + targetExptMap.index((expt,int(splitline[1]),int(splitline[0])))] = float(splitline[3])
-      line = f.readline()
-    f.close()
-
-    lifetimes = []
-    lifetime_uncs = []
-    f = open(self.configDict["targetPOINinp"],'r')
-    line = f.readline()
-    while line:
-      if "!BR" in line:
-        nObs = int(line.split(',')[0])
-        for i in range(nObs):
-          line = f.readline()
-          splitline = line.split(',')
-          targetExptMap.append((0,0,0))
-          observables.append(float(splitline[4]))
-          uncertainties.append(float(splitline[5]))
-      if "!LT" in line:
-        nObs = int(line.split(',')[0])
-        for i in range(nObs):
-          line = f.readline()
-          splitline = line.split(',')
-          targetExptMap.append((0,0,0))
-          lifetimes.append(float(splitline[1]))
-          lifetime_uncs.append(float(splitline[2]))
-      if "!DL" in line:
-        nObs = int(line.split(',')[0])
-        for i in range(nObs):
-          line = f.readline()
-          splitline = line.split(',')
-          targetExptMap.append((0,0,0))
+      while line:
+        splitline = line.split(",")
+        if len(splitline) == 7:
+          expt = int(splitline[0])
+        elif len(splitline) == 4:
+          targetExptMap.append((expt,int(splitline[0]),int(splitline[1])))
           observables.append(float(splitline[2]))
           uncertainties.append(float(splitline[3]))
-        observables += lifetimes
-        uncertainties += lifetime_uncs
-      if "!ME" in line:
-        nObs = int(line.split(',')[0])
-        for i in range(nObs):
-          line = f.readline()
-          splitline = line.split(',')
-          targetExptMap.append((0,0,0))
-          observables.append(float(splitline[3]))
-          uncertainties.append(float(splitline[4]))
+        line = f.readline()
+      f.close()
+
+      targetCorr = self.getCorrFile(self.configDict["targetINTIinp"])
+
+      f = open(targetCorr,'r')
       line = f.readline()
-    f.close()
+      while line:
+        splitline = line.split()
+        if len(splitline) == 7:
+          expt = int(splitline[0])
+        elif len(splitline) == 4:
+          if (expt,int(splitline[0]),int(splitline[1])) in targetExptMap:
+            observables[len(beamExptMap) + targetExptMap.index((expt,int(splitline[0]),int(splitline[1])))] = float(splitline[2])
+            uncertainties[len(beamExptMap) + targetExptMap.index((expt,int(splitline[0]),int(splitline[1])))] = float(splitline[3])
+          elif (expt,int(splitline[1]),int(splitline[0])) in targetExptMap:
+            observables[len(beamExptMap) + targetExptMap.index((expt,int(splitline[1]),int(splitline[0])))] = float(splitline[2])
+            uncertainties[len(beamExptMap) + targetExptMap.index((expt,int(splitline[1]),int(splitline[0])))] = float(splitline[3])
+        line = f.readline()
+      f.close()
+
+      lifetimes = []
+      lifetime_uncs = []
+      f = open(self.configDict["targetPOINinp"],'r')
+      line = f.readline()
+      while line:
+        if "!BR" in line:
+          nObs = int(line.split(',')[0])
+          for i in range(nObs):
+            line = f.readline()
+            splitline = line.split(',')
+            targetExptMap.append((0,0,0))
+            observables.append(float(splitline[4]))
+            uncertainties.append(float(splitline[5]))
+        if "!LT" in line:
+          nObs = int(line.split(',')[0])
+          for i in range(nObs):
+            line = f.readline()
+            splitline = line.split(',')
+            targetExptMap.append((0,0,0))
+            lifetimes.append(float(splitline[1]))
+            lifetime_uncs.append(float(splitline[2]))
+        if "!DL" in line:
+          nObs = int(line.split(',')[0])
+          for i in range(nObs):
+            line = f.readline()
+            splitline = line.split(',')
+            targetExptMap.append((0,0,0))
+            observables.append(float(splitline[2]))
+            uncertainties.append(float(splitline[3]))
+          observables += lifetimes
+          uncertainties += lifetime_uncs
+        if "!ME" in line:
+          nObs = int(line.split(',')[0])
+          for i in range(nObs):
+            line = f.readline()
+            splitline = line.split(',')
+            targetExptMap.append((0,0,0))
+            observables.append(float(splitline[3]))
+            uncertainties.append(float(splitline[4]))
+        line = f.readline()
+      f.close()
 
     return observables,uncertainties,beamExptMap,targetExptMap
-
+    
   #Does the same thing as getExperimentalObservables, but for the results simulated in OP,POIN
   def getPOINobservables(self,output_file):
     computedObservables = []
@@ -493,28 +502,32 @@ class gosiaManager:
         beamUpperLimits.append(observables[j]*upl)
         expt += 1
     
-    targetUpperLimits = []
+    if self.configDict["simulMin"] == True:
+      targetUpperLimits = []
 
-    f = open(self.configDict["targetPOINinp"],'r')
-    line = f.readline()
-    while line:
-      if '!YNRM' in line:
-        splitline = line.strip().split("!")[0].split(",")
-        ynrm = (int(splitline[0]),int(splitline[1]))
-      elif '!UPL' in line:
-        splitline = line.strip().split("!")
-        upl = float(splitline[0])
+      f = open(self.configDict["targetPOINinp"],'r')
       line = f.readline()
-    f.close()
-    expt = 1
-    for j in range(len(targetExptMap)):
-      if targetExptMap[j] == (expt,ynrm[0],ynrm[1]) or targetExptMap[j] == (expt,ynrm[0],ynrm[1]):
-        targetUpperLimits.append(observables[j + len(beamExptMap)]*upl)
-        expt += 1
+      while line:
+        if '!YNRM' in line:
+          splitline = line.strip().split("!")[0].split(",")
+          ynrm = (int(splitline[0]),int(splitline[1]))
+        elif '!UPL' in line:
+          splitline = line.strip().split("!")
+          upl = float(splitline[0])
+        line = f.readline()
+      f.close()
+      expt = 1
+      for j in range(len(targetExptMap)):
+        if targetExptMap[j] == (expt,ynrm[0],ynrm[1]) or targetExptMap[j] == (expt,ynrm[0],ynrm[1]):
+          targetUpperLimits.append(observables[j + len(beamExptMap)]*upl)
+          expt += 1
+      
+      upperLimits = []
+      for j in range(len(beamUpperLimits)):
+        upperLimits.append((beamUpperLimits[j],targetUpperLimits[j]))
     
-    upperLimits = []
-    for j in range(len(beamUpperLimits)):
-      upperLimits.append((beamUpperLimits[j],targetUpperLimits[j]))
+    else:
+      upperLimits = beamUpperLimits
     return upperLimits
 
   def createSubDirectories(self,chainNum):
@@ -528,13 +541,14 @@ class gosiaManager:
     shutil.copy(self.configDict["beamINTIinp"],chainDir)
     shutil.copy(self.configDict["beamMAPinp"],chainDir)
     shutil.copy(self.configDict["beamPOINinp"],chainDir)
-    shutil.copy(self.configDict["targetINTIinp"],chainDir)
-    shutil.copy(self.configDict["targetMAPinp"],chainDir)
-    shutil.copy(self.configDict["targetPOINinp"],chainDir)
     shutil.copy(self.configDict["rawBeamYields"],chainDir)
-    shutil.copy(self.configDict["rawTargetYields"],chainDir)
     shutil.copy(self.configDict["beam_bst"],chainDir)
-    shutil.copy(self.configDict["target_bst"],chainDir)
+    if self.configDict["simulMin"] == True:
+      shutil.copy(self.configDict["targetINTIinp"],chainDir)
+      shutil.copy(self.configDict["targetMAPinp"],chainDir)
+      shutil.copy(self.configDict["targetPOINinp"],chainDir)
+      shutil.copy(self.configDict["rawTargetYields"],chainDir)
+      shutil.copy(self.configDict["target_bst"],chainDir)
     return chainDirPrefix
 
   def removeSubDirectories(self,chainNum):
@@ -567,3 +581,24 @@ class gosiaManager:
     with open(input_file) as f:
         subprocess.run([self.configDict["gosia2"]], stdin=f, stdout=subprocess.DEVNULL, cwd=dir)
     return outputFile
+  
+  def getScalingFactors(self):
+    f = open(self.configDict["beamPOINinp"])
+    exptScaledTo = []
+    exptScalingFactors = []
+    line = f.readline()
+    while "EXPT" not in line:
+      line = f.readline()
+    f.readline()
+    line = f.readline()
+    while "CONT" not in line:
+      exptScaledTo.append(line.split(',')[10])
+      line = f.readline()
+    for j in range(len(exptScaledTo)):
+      if exptScaledTo[j] == j+1:
+        exptScaledTo[j] = 0
+    while line:
+      if "!SCL" in line:
+        exptScalingFactors.append()
+      line = f.readline()
+    return exptScaledTo, exptScalingFactors

@@ -10,12 +10,17 @@ well known target matrix elements should be constrained to within a few sigma of
 literature value). In the OP,POIN input, comments are needed on the following lines in 
 OP,YIEL:
 
-YNRM - please comment this line with !YNRM
+NS1,NS2 - please comment this line with !YNRM
 UPL - please comment this line with !UPL
 NBRA - please comment this line with !BR
 NL - please comment this line with !LT
 NDL - please comment this line with !DL
 NAMX - please comment this line with !ME
+
+If you are not doing simultaneous beam/target minimization, you will also need to comment your scaling factors:
+
+YNRM - please comment EACH of these lines with !SCL
+You must comment each of those lines even for experiments that have independent scaling.
 
 These comments are used for functions that parse the input file to be able to find your limits
 and constraints. Note that this code is not set up to handle multiple YNRM or UPL values, so 
@@ -99,15 +104,12 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
     gm.make_bst(os.path.join(chainDir,beam_bst),positions[i][:nBeamParams])
     gm.make_bst(os.path.join(chainDir,target_bst),positions[i][nBeamParams:])
     gm.runGosiaInDir(beamPOINinp,chainDir)
-    gm.runGosiaInDir(targetPOINinp,chainDir)
     beamOutputFile = os.path.join(chainDir,gm.getOutputFile(beamPOINinp))
-    targetOutputFile = os.path.join(chainDir,gm.getOutputFile(targetPOINinp))
-    beamINTIout = os.path.join(chainDir,gm.getOutputFile(beamINTIinp))
-    targetINTIout = os.path.join(chainDir,gm.getOutputFile(targetINTIinp))
-    beamCorrFile = os.path.join(chainDir,gm.getCorrFile(beamPOINinp))
-    targetCorrFile = os.path.join(chainDir,gm.getCorrFile(targetPOINinp))
     computedObservables = gm.getPOINobservables(beamOutputFile)
-    computedObservables += gm.getPOINobservables(targetOutputFile)
+    if simulMin == True:
+      gm.runGosiaInDir(targetPOINinp,chainDir)
+      targetOutputFile = os.path.join(chainDir,gm.getOutputFile(targetPOINinp))
+      computedObservables += gm.getPOINobservables(targetOutputFile)
     expt = []
     scalingFactors = []
     for j in range(len(beamExptMap)):
@@ -116,14 +118,17 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
       expt.append(targetExptMap[j][0])
     nExpt = max(expt)
     for j in range(nExpt):
-      tempSum1 = 0
-      tempSum2 = 0
-      for k in range(len(expt)):
-        if expt[k] == j+1 and observables[k] != 0:
-          tempSum1 += (observables[k]*computedObservables[k])/uncertainties[k]**2
-          tempSum2 += computedObservables[k]**2/uncertainties[k]**2
-      scalingFactor = tempSum1/tempSum2
-      scalingFactors.append(scalingFactor)
+      if simulMin == True or normalizingExpts[j] == 0:
+        tempSum1 = 0
+        tempSum2 = 0
+        for k in range(len(expt)):
+          if expt[k] == j+1 and observables[k] != 0:
+            tempSum1 += (observables[k]*computedObservables[k])/uncertainties[k]**2
+            tempSum2 += computedObservables[k]**2/uncertainties[k]**2
+        scalingFactor = tempSum1/tempSum2
+        scalingFactors.append(scalingFactor)
+      else:
+        scalingFactor = scalingFactors[normalizingExpts[j]]*normalizingFactors[j]
     for j in range(nExpt):
       for k in range(len(expt)):
         if expt[k] == j+1:
@@ -145,18 +150,23 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
 #Initializes everything
 gm = gosiaManager.gosiaManager(configFile)
 
+#Store important parameters from the config file
+simulMin = gm.configDict["simulMin"]
 beamINTIinp = gm.configDict["beamINTIinp"]
 beamMAPinp = gm.configDict["beamMAPinp"]
 beamPOINinp = gm.configDict["beamPOINinp"]
-targetINTIinp = gm.configDict["targetINTIinp"]
-targetMAPinp = gm.configDict["targetMAPinp"]
-targetPOINinp = gm.configDict["targetPOINinp"]
-nThreads = gm.configDict["nThreads"] #number of threads used for particles
 nBeamParams = gm.configDict["nBeamParams"]
-nTargetParams = gm.configDict["nTargetParams"]
 beam_bst = gm.configDict["beam_bst"]
-target_bst = gm.configDict["target_bst"]
+if simulMin == True:
+  targetINTIinp = gm.configDict["targetINTIinp"]
+  targetMAPinp = gm.configDict["targetMAPinp"]
+  targetPOINinp = gm.configDict["targetPOINinp"]
+  nTargetParams = gm.configDict["nTargetParams"]
+  target_bst = gm.configDict["target_bst"]
+nThreads = gm.configDict["nThreads"] #number of threads used for particles
 nDimensions = nBeamParams + nTargetParams
+
+#Sets the parameters of the particle swarm to the values I found to be optimal, unless other parameters are specified in the config file.
 if "nParticles" in gm.configDict.keys():
   nParticles = int(gm.configDict["nParticles"])
 else:
@@ -184,13 +194,17 @@ else:
 
 #Gets the bounds for each matrix element from the INTI files.
 beamMatrixElements = gm.getMatrixElements(beamPOINinp)
-targetMatrixElements = gm.getMatrixElements(targetPOINinp)
 beamLoBounds = beamMatrixElements["LoBound"].to_numpy()
 beamHiBounds = beamMatrixElements["HiBound"].to_numpy()
-targetLoBounds = targetMatrixElements["LoBound"].to_numpy()
-targetHiBounds = targetMatrixElements["HiBound"].to_numpy()
-loBounds = np.concatenate((beamLoBounds,targetLoBounds))
-hiBounds = np.concatenate((beamHiBounds,targetHiBounds))
+if simulMin == True:
+  targetMatrixElements = gm.getMatrixElements(targetPOINinp)
+  targetLoBounds = targetMatrixElements["LoBound"].to_numpy()
+  targetHiBounds = targetMatrixElements["HiBound"].to_numpy()
+  loBounds = np.concatenate((beamLoBounds,targetLoBounds))
+  hiBounds = np.concatenate((beamHiBounds,targetHiBounds))
+else:
+  loBounds = beamLoBounds
+  hiBounds = beamHiBounds
 paramBounds = (loBounds,hiBounds)
 
 #Run GOSIA to initialize everything. This is the only time INTI will be run, so use a
@@ -201,7 +215,10 @@ paramBounds = (loBounds,hiBounds)
 #gm.runGosia(beamMAPinp)
 #gm.runGosia(targetMAPinp)
 beamCorr = gm.getCorrFile(beamINTIinp)
-targetCorr = gm.getCorrFile(targetINTIinp)
+if(simulMin == True):
+  targetCorr = gm.getCorrFile(targetINTIinp)
+else:
+  normalizingExpts,normalizingFactors = gm.getScalingFactors()
 
 #Get experimental observables and the beam and target maps
 observables,uncertainties,beamExptMap,targetExptMap = gm.getExperimentalObservables()
