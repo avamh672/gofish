@@ -102,7 +102,8 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
   chisqArray = []
   for i in range(threadFirstLast[0],threadFirstLast[1]):
     gm.make_bst(os.path.join(chainDir,beam_bst),positions[i][:nBeamParams])
-    gm.make_bst(os.path.join(chainDir,target_bst),positions[i][nBeamParams:])
+    if simulMin == True:
+      gm.make_bst(os.path.join(chainDir,target_bst),positions[i][nBeamParams:])
     gm.runGosiaInDir(beamPOINinp,chainDir)
     beamOutputFile = os.path.join(chainDir,gm.getOutputFile(beamPOINinp))
     computedObservables = gm.getPOINobservables(beamOutputFile)
@@ -128,7 +129,8 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
         scalingFactor = tempSum1/tempSum2
         scalingFactors.append(scalingFactor)
       else:
-        scalingFactor = scalingFactors[normalizingExpts[j]]*normalizingFactors[j]
+        scalingFactor = scalingFactors[normalizingExpts[j]-1]*normalizingFactors[j]
+        scalingFactors.append(scalingFactor)
     for j in range(nExpt):
       for k in range(len(expt)):
         if expt[k] == j+1:
@@ -139,10 +141,14 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
       if observables[j] != 0:
         chisq += ((computedObservables[j]-observables[j])/uncertainties[j])**2
       elif expt[j] != 0:
-        if j < len(beamExptMap) and computedObservables[j] >= exptUpperLimits[expt[j]-1][0]:
-          chisq += ((computedObservables[j]-exptUpperLimits[expt[j]-1][0])/exptUpperLimits[expt[j]-1][0])**2
-        elif j >= len(beamExptMap) and computedObservables[j] >= exptUpperLimits[expt[j]-1][1]:
-          chisq += ((computedObservables[j]-exptUpperLimits[expt[j]-1][1])/exptUpperLimits[expt[j]-1][1])**2
+        if simulMin == True:
+          if j < len(beamExptMap) and computedObservables[j] >= exptUpperLimits[expt[j]-1][0]:
+            chisq += ((computedObservables[j]-exptUpperLimits[expt[j]-1][0])/exptUpperLimits[expt[j]-1][0])**2
+          elif j >= len(beamExptMap) and computedObservables[j] >= exptUpperLimits[expt[j]-1][1]:
+            chisq += ((computedObservables[j]-exptUpperLimits[expt[j]-1][1])/exptUpperLimits[expt[j]-1][1])**2
+        else:
+          if j < len(beamExptMap) and computedObservables[j] >= exptUpperLimits[expt[j]-1]:
+            chisq += ((computedObservables[j]-exptUpperLimits[expt[j]-1])/exptUpperLimits[expt[j]-1])**2
     chisqArray.append(chisq)
   chisqDict[threadFirstLast[0]] = chisqArray
   return 
@@ -157,14 +163,15 @@ beamMAPinp = gm.configDict["beamMAPinp"]
 beamPOINinp = gm.configDict["beamPOINinp"]
 nBeamParams = gm.configDict["nBeamParams"]
 beam_bst = gm.configDict["beam_bst"]
+nDimensions = nBeamParams
 if simulMin == True:
   targetINTIinp = gm.configDict["targetINTIinp"]
   targetMAPinp = gm.configDict["targetMAPinp"]
   targetPOINinp = gm.configDict["targetPOINinp"]
   nTargetParams = gm.configDict["nTargetParams"]
   target_bst = gm.configDict["target_bst"]
+  nDimensions += nTargetParams
 nThreads = gm.configDict["nThreads"] #number of threads used for particles
-nDimensions = nBeamParams + nTargetParams
 
 #Sets the parameters of the particle swarm to the values I found to be optimal, unless other parameters are specified in the config file.
 if "nParticles" in gm.configDict.keys():

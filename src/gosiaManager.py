@@ -19,20 +19,25 @@ class gosiaManager:
         if splitline[0].strip() in integerArguments:
           self.configDict[splitline[0].strip()] = int(splitline[1].strip())
         elif splitline[0].strip() in booleanArguments:
-          self.configDict[splitline[0].strip()] = bool(splitline[1].strip())
+          if splitline[1].strip() == "True":
+            self.configDict[splitline[0].strip()] = True
+          elif splitline[1].strip() == "False":
+            self.configDict[splitline[0].strip()] = False
+          else:
+            raise Exception("ERROR: simulMin must be True or False!")
         else:
           self.configDict[splitline[0].strip()] = splitline[1].strip()
         line = f.readline()
       f.close()
     else:
       raise Exception("ERROR: Config file is not readable!")
-
+    
     expectedFromConfig = ["gosia","gosia2","beamINTIinp","beamMAPinp","beamPOINinp","beam_bst","beamYields","rawBeamYields","scratchDirectory","simulMin","nThreads","nBeamParams"]
     if "simulMin" in self.configDict.keys():
       if self.configDict["simulMin"] == True:
         expectedFromConfig += ["targetINTIinp","targetMAPinp","targetPOINinp","target_bst","targetYields","rawTargetYields","nTargetParams"]
-      else:
-        raise Exception("ERROR: Variable simulMin not in config file! Please set to true for simultaneous beam/target minimization and false otherwise.")
+    else:
+      raise Exception("ERROR: Variable simulMin not in config file! Please set to true for simultaneous beam/target minimization and false otherwise.")
     for key in expectedFromConfig:
       if key not in self.configDict.keys():
         raise Exception("ERROR: Variable %s not in config file!" % key)
@@ -58,6 +63,15 @@ class gosiaManager:
     f = open(input_file,'r')
     line = f.readline()
     while line[:2] != "4,":
+      line = f.readline()
+    output_file = f.readline()[:-1]
+    f.close()
+    return output_file
+
+  def getMapFile(self,input_file):
+    f = open(input_file,'r')
+    line = f.readline()
+    while line[:2] != "7,":
       line = f.readline()
     output_file = f.readline()[:-1]
     f.close()
@@ -435,7 +449,10 @@ class gosiaManager:
           line = f.readline()
         while line != "\n" and "END" not in line:
           splitline = line.split()
-          computedObservables.append(float(splitline[7]))
+          if "***" in splitline[7]:
+            computedObservables.append(10000)
+          else:
+            computedObservables.append(float(splitline[7]))
           line = f.readline()
       elif "E2/M1 MIXING RATIOS" in line and "EXPERIMENTAL" not in line and "WEIGHT" not in line:
         for i in range(3):
@@ -543,12 +560,16 @@ class gosiaManager:
     shutil.copy(self.configDict["beamPOINinp"],chainDir)
     shutil.copy(self.configDict["rawBeamYields"],chainDir)
     shutil.copy(self.configDict["beam_bst"],chainDir)
+    shutil.copy(self.getMapFile(self.configDict["beamPOINinp"]),chainDir)
+    shutil.copy(self.getCorrFile(self.configDict["beamPOINinp"]),chainDir)
     if self.configDict["simulMin"] == True:
       shutil.copy(self.configDict["targetINTIinp"],chainDir)
       shutil.copy(self.configDict["targetMAPinp"],chainDir)
       shutil.copy(self.configDict["targetPOINinp"],chainDir)
       shutil.copy(self.configDict["rawTargetYields"],chainDir)
       shutil.copy(self.configDict["target_bst"],chainDir)
+      shutil.copy(self.getMapFile(self.configDict["targetPOINinp"]),chainDir)
+      shutil.copy(self.getCorrFile(self.configDict["targetPOINinp"]),chainDir)
     return chainDirPrefix
 
   def removeSubDirectories(self,chainNum):
@@ -592,13 +613,13 @@ class gosiaManager:
     f.readline()
     line = f.readline()
     while "CONT" not in line:
-      exptScaledTo.append(line.split(',')[10])
+      exptScaledTo.append(int(line.split(',')[10]))
       line = f.readline()
     for j in range(len(exptScaledTo)):
       if exptScaledTo[j] == j+1:
         exptScaledTo[j] = 0
     while line:
       if "!SCL" in line:
-        exptScalingFactors.append()
+        exptScalingFactors.append(float(line.split("!")[0].strip()))
       line = f.readline()
     return exptScaledTo, exptScalingFactors
