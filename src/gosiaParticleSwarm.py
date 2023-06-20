@@ -252,11 +252,21 @@ my_swarm = P.create_swarm(n_particles=nParticles,dimensions=nDimensions,bounds=p
 iterSwitch = 350
 neighborsArray = [20,30,40,60,80,120,160]
 
-#bestParams = gm.read_bst(beam_bst)
-#bestParams += gm.read_bst(target_bst)
-#my_swarm.position[0,:] = bestParams
+if os.path.exists("checkpoint_%i" % batchNumber):
+  f = open("checkpoint_%i/psoSaveIterAndCost.csv" % batchNumber)
+  iterStart = int(f.readline().strip()) + 1
+  my_swarm.best_cost = float(f.readline().strip())
+  f.close()
+  my_swarm.position = np.loadtxt('checkpoint_%i/psoSavePositions.csv' % batchNumber,delimiter=',')
+  my_swarm.velocity = np.loadtxt('checkpoint_%i/psoSaveVelocities.csv' % batchNumber,delimiter=',')
+  my_swarm.pbest_pos = np.loadtxt('checkpoint_%i/psoSavePBestPos.csv' % batchNumber,delimiter=',')
+  my_swarm.pbest_cost = np.loadtxt('checkpoint_%i/psoSavePBestCost.csv' % batchNumber,delimiter=',')
+  my_swarm.best_pos = np.loadtxt('checkpoint_%i/psoSaveBestPos.csv' % batchNumber,delimiter=',')  
+else:
+  os.mkdir("checkpoint_%i" % batchNumber)
+  iterStart = 0
 iterations = 500
-for i in range(iterations):
+for i in range(iterStart,iterations):
   if i == iterSwitch:
     my_topology = Star()
   
@@ -293,6 +303,16 @@ for i in range(iterations):
   else:
     my_swarm.velocity = my_topology.compute_velocity(my_swarm)
     my_swarm.position = my_topology.compute_position(my_swarm,bounds=paramBounds,bh=boundaryHandler)
+  if i != iterations-1:
+    np.savetxt('checkpoint_%i/psoSavePositions.csv' % batchNumber,my_swarm.position,delimiter=',')
+    np.savetxt('checkpoint_%i/psoSaveVelocities.csv' % batchNumber,my_swarm.velocity,delimiter=',')
+    np.savetxt('checkpoint_%i/psoSavePBestPos.csv' % batchNumber,my_swarm.pbest_pos,delimiter=',')
+    np.savetxt('checkpoint_%i/psoSavePBestCost.csv' % batchNumber,my_swarm.pbest_cost,delimiter=',')
+    np.savetxt('checkpoint_%i/psoSaveBestPos.csv' % batchNumber,my_swarm.best_pos,delimiter=',')
+    f = open('checkpoint_%i/psoSaveIterAndCost.csv' % batchNumber,'w')
+    f.write(str(i) + "\n")
+    f.write(str(my_swarm.best_cost) + "\n")
+    f.close()
 
 f = open('adaptiveParticleSwarmResult_%i.csv' % batchNumber,'w')
 f.write('The best cost found by our swarm is: {:.4f}\n'.format(my_swarm.best_cost))
