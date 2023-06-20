@@ -119,18 +119,19 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
       expt.append(targetExptMap[j][0])
     nExpt = max(expt)
     for j in range(nExpt):
-      if simulMin == True or normalizingExpts[j] == 0:
-        tempSum1 = 0
-        tempSum2 = 0
-        for k in range(len(expt)):
-          if expt[k] == j+1 and observables[k] != 0:
-            tempSum1 += (observables[k]*computedObservables[k])/uncertainties[k]**2
-            tempSum2 += computedObservables[k]**2/uncertainties[k]**2
-        scalingFactor = tempSum1/tempSum2
-        scalingFactors.append(scalingFactor)
-      else:
-        scalingFactor = scalingFactors[normalizingExpts[j]-1]*normalizingFactors[j]
-        scalingFactors.append(scalingFactor)
+      #if simulMin == True or normalizingExpts[j] >= 0:
+      tempSum1 = 0
+      tempSum2 = 0
+      for k in range(len(expt)):
+        if expt[k] == j+1 and observables[k] != 0:
+          tempSum1 += (observables[k]*computedObservables[k])/uncertainties[k]**2
+          tempSum2 += computedObservables[k]**2/uncertainties[k]**2
+      scalingFactor = tempSum1/tempSum2
+      scalingFactors.append(scalingFactor)
+      #else:
+        #scalingFactor = scalingFactors[normalizingExpts[j]-1]*normalizingFactors[j]
+        #scalingFactors.append(scalingFactor)
+    #print(scalingFactors)
     for j in range(nExpt):
       for k in range(len(expt)):
         if expt[k] == j+1:
@@ -140,6 +141,7 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
     for j in range(nObservables):
       if observables[j] != 0:
         chisq += ((computedObservables[j]-observables[j])/uncertainties[j])**2
+        #print(computedObservables[j],observables[j],uncertainties[j],chisq)
       elif expt[j] != 0:
         if simulMin == True:
           if j < len(beamExptMap) and computedObservables[j] >= exptUpperLimits[expt[j]-1][0]:
@@ -149,6 +151,7 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
         else:
           if j < len(beamExptMap) and computedObservables[j] >= exptUpperLimits[expt[j]-1]:
             chisq += ((computedObservables[j]-exptUpperLimits[expt[j]-1])/exptUpperLimits[expt[j]-1])**2
+            #print(computedObservables[j],exptUpperLimits[expt[j]-1],chisq)
     chisqArray.append(chisq)
   chisqDict[threadFirstLast[0]] = chisqArray
   return 

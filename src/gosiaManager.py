@@ -499,6 +499,7 @@ class gosiaManager:
       line = f.readline()
     return corrections
 
+  #Reads the upper limits for transitions from the GOSIA input file. Requires YNRM and UPL flags to be set in the input file.
   def getUpperLimits(self,beamExptMap,targetExptMap,observables):
     beamUpperLimits = []
     
