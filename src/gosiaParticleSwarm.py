@@ -112,25 +112,49 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
       targetOutputFile = os.path.join(chainDir,gm.getOutputFile(targetPOINinp))
       computedObservables += gm.getPOINobservables(targetOutputFile)
     expt = []
-    scalingFactors = []
     for j in range(len(beamExptMap)):
       expt.append(beamExptMap[j][0])
     for j in range(len(targetExptMap)):
       expt.append(targetExptMap[j][0])
     nExpt = max(expt)
+    scalingFactors = [0]*nExpt
     for j in range(nExpt):
-      #if simulMin == True or normalizingExpts[j] >= 0:
-      tempSum1 = 0
-      tempSum2 = 0
-      for k in range(len(expt)):
-        if expt[k] == j+1 and observables[k] != 0:
-          tempSum1 += (observables[k]*computedObservables[k])/uncertainties[k]**2
-          tempSum2 += computedObservables[k]**2/uncertainties[k]**2
-      scalingFactor = tempSum1/tempSum2
-      scalingFactors.append(scalingFactor)
-      #else:
-        #scalingFactor = scalingFactors[normalizingExpts[j]-1]*normalizingFactors[j]
-        #scalingFactors.append(scalingFactor)
+      if simulMin == True or normalizingExpts[j] >= 0:
+        tempSum1 = 0
+        tempSum2 = 0
+        for k in range(len(expt)):
+          if expt[k] == j+1 and observables[k] != 0:
+            tempSum1 += (observables[k]*computedObservables[k])/uncertainties[k]**2
+            tempSum2 += computedObservables[k]**2/uncertainties[k]**2
+          elif expt[k] == j+1:
+            tempSum2 += (computedObservables[k]**2/exptUpperLimits[expt[k]-1]**2)
+        scalingFactor = tempSum1/tempSum2
+        scalingFactors[j] = scalingFactor
+      else:
+        tempSum1 = 0
+        tempSum2 = 0
+        for k in range(len(expt)):
+          if normalizingExpts[expt[k]-1] == j+1 and observables[k] != 0 and expt[k] != 0:
+            tempSum1 += (observables[k]*computedObservables[k])/uncertainties[k]**2
+            tempSum2 += (computedObservables[k]**2)/uncertainties[k]**2
+          elif normalizingExpts[expt[k]-1] == j+1 and expt[k] != 0:
+            tempSum2 += (computedObservables[k]**2/exptUpperLimits[expt[k]-1]**2)
+        if tempSum2 != 0:
+          scalingFactor = tempSum1/tempSum2
+          for k in range(len(normalizingExpts)):
+            if normalizingExpts[k] == j+1:
+              scalingFactors[k] = scalingFactor
+    #tempSum = 0
+    #count = 0
+    #for j in range(len(normalizingExpts)):
+      #if normalizingExpts[j] == 1:
+        #tempSum += scalingFactors[j]
+        #count += 1
+        #print(tempSum,count)
+    #scalingFactor = tempSum/count
+    #for j in range(len(normalizingExpts)):
+      #if normalizingExpts[j] == 1:
+        #scalingFactors[j] = 18.85
     #print(scalingFactors)
     for j in range(nExpt):
       for k in range(len(expt)):
@@ -142,6 +166,7 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
       if observables[j] != 0:
         chisq += ((computedObservables[j]-observables[j])/uncertainties[j])**2
         #print(computedObservables[j],observables[j],uncertainties[j],chisq)
+        print(expt[j],chisq)
       elif expt[j] != 0:
         if simulMin == True:
           if j < len(beamExptMap) and computedObservables[j] >= exptUpperLimits[expt[j]-1][0]:
@@ -152,7 +177,9 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
           if j < len(beamExptMap) and computedObservables[j] >= exptUpperLimits[expt[j]-1]:
             chisq += ((computedObservables[j]-exptUpperLimits[expt[j]-1])/exptUpperLimits[expt[j]-1])**2
             #print(computedObservables[j],exptUpperLimits[expt[j]-1],chisq)
+            print(expt[j],chisq)
     chisqArray.append(chisq)
+    #a = 1/0
   chisqDict[threadFirstLast[0]] = chisqArray
   return 
 
@@ -229,9 +256,12 @@ if(simulMin == True):
   targetCorr = gm.getCorrFile(targetINTIinp)
 else:
   normalizingExpts,normalizingFactors = gm.getScalingFactors()
+  rawYields,rawUncertainties = gm.getRawYields()
 
 #Get experimental observables and the beam and target maps
 observables,uncertainties,beamExptMap,targetExptMap = gm.getExperimentalObservables()
+#observables[0:288] = rawYields
+#uncertainties[0:288] = rawUncertainties
 exptUpperLimits = gm.getUpperLimits(beamExptMap,targetExptMap,observables)
 
 #Initialize the particle swarm

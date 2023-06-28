@@ -616,11 +616,30 @@ class gosiaManager:
     while "CONT" not in line:
       exptScaledTo.append(int(line.split(',')[10]))
       line = f.readline()
-    for j in range(len(exptScaledTo)):
-      if exptScaledTo[j] == j+1:
-        exptScaledTo[j] = 0
+    #for j in range(len(exptScaledTo)):
+      #if exptScaledTo[j] == j+1:
+        #exptScaledTo[j] = 0
     while line:
       if "!SCL" in line:
         exptScalingFactors.append(float(line.split("!")[0].strip()))
       line = f.readline()
     return exptScaledTo, exptScalingFactors
+
+  def getRawYields(self):
+    rawYields = []
+    rawUncertainties = []
+    expt = 0
+    #parse the corrected yields file and store them, along with the exptMap
+    f = open(self.configDict["beamYields"],'r')
+    line = f.readline()
+    while line: 
+      splitline = line.split(",")
+      if len(splitline) == 7:
+        expt = int(splitline[0])
+      elif len(splitline) == 4:
+        rawYields.append(float(splitline[2]))
+        rawUncertainties.append(float(splitline[3]))
+      line = f.readline()
+    f.close()
+
+    return rawYields, rawUncertainties
