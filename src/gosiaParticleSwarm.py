@@ -119,7 +119,7 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
     nExpt = max(expt)
     scalingFactors = [0]*nExpt
     for j in range(nExpt):
-      if simulMin == True or normalizingExpts[j] >= 0:
+      if simulMin == True:# or normalizingExpts[j] >= 0:
         tempSum1 = 0
         tempSum2 = 0
         for k in range(len(expt)):
