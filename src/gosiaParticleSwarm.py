@@ -10,7 +10,7 @@ well known target matrix elements should be constrained to within a few sigma of
 literature value). In the OP,POIN input, comments are needed on the following lines in 
 OP,YIEL:
 
-NS1,NS2 - please comment this line with !YNRM
+NS1,NS2 - please comment this line with !NS
 UPL - please comment this line with !UPL
 NBRA - please comment this line with !BR
 NL - please comment this line with !LT
@@ -100,6 +100,7 @@ def getSwarmChisq(positions,iteration,nThreads=1):
 #computes the chisq values.
 def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
   chisqArray = []
+  #Loop over the particles managed by this thread
   for i in range(threadFirstLast[0],threadFirstLast[1]):
     gm.make_bst(os.path.join(chainDir,beam_bst),positions[i][:nBeamParams])
     if simulMin == True:
@@ -119,15 +120,14 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
     nExpt = max(expt)
     scalingFactors = [0]*nExpt
     for j in range(nExpt):
-      if simulMin == True:# or normalizingExpts[j] >= 0:
+      if simulMin == True:
         tempSum1 = 0
         tempSum2 = 0
         for k in range(len(expt)):
           if expt[k] == j+1 and observables[k] != 0:
+            #print(expt[k],observables[k],computedObservables[k],uncertainties[k])
             tempSum1 += (observables[k]*computedObservables[k])/uncertainties[k]**2
             tempSum2 += computedObservables[k]**2/uncertainties[k]**2
-          elif expt[k] == j+1:
-            tempSum2 += (computedObservables[k]**2/exptUpperLimits[expt[k]-1]**2)
         scalingFactor = tempSum1/tempSum2
         scalingFactors[j] = scalingFactor
       else:
@@ -135,15 +135,15 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
         tempSum2 = 0
         for k in range(len(expt)):
           if normalizingExpts[expt[k]-1] == j+1 and observables[k] != 0 and expt[k] != 0:
-            tempSum1 += (observables[k]*computedObservables[k])/uncertainties[k]**2
-            tempSum2 += (computedObservables[k]**2)/uncertainties[k]**2
-          elif normalizingExpts[expt[k]-1] == j+1 and expt[k] != 0:
-            tempSum2 += (computedObservables[k]**2/exptUpperLimits[expt[k]-1]**2)
+            #print(normalizingExpts[expt[k]-1],expt[k])
+            tempSum1 += (observables[k]*computedObservables[k]*normalizingFactors[expt[k]-1])/uncertainties[k]**2
+            tempSum2 += (computedObservables[k]**2*normalizingFactors[expt[k]-1]**2)/uncertainties[k]**2
+        #print(tempSum1,tempSum2)
         if tempSum2 != 0:
           scalingFactor = tempSum1/tempSum2
           for k in range(len(normalizingExpts)):
             if normalizingExpts[k] == j+1:
-              scalingFactors[k] = scalingFactor
+              scalingFactors[k] = scalingFactor*normalizingFactors[k]
     #tempSum = 0
     #count = 0
     #for j in range(len(normalizingExpts)):
@@ -160,13 +160,16 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
       for k in range(len(expt)):
         if expt[k] == j+1:
           computedObservables[k] *= scalingFactors[j]
+          #if simulMin == False:
+            #computedObservables[k] *= normalizingFactors[j]
+    #print(computedObservables)
     nObservables = len(observables)
     chisq = 0
     for j in range(nObservables):
       if observables[j] != 0:
         chisq += ((computedObservables[j]-observables[j])/uncertainties[j])**2
-        #print(computedObservables[j],observables[j],uncertainties[j],chisq)
-        print(expt[j],chisq)
+        #print(expt[j],computedObservables[j],observables[j],uncertainties[j],chisq)
+        #print(expt[j],chisq)
       elif expt[j] != 0:
         if simulMin == True:
           if j < len(beamExptMap) and computedObservables[j] >= exptUpperLimits[expt[j]-1][0]:
@@ -176,10 +179,11 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
         else:
           if j < len(beamExptMap) and computedObservables[j] >= exptUpperLimits[expt[j]-1]:
             chisq += ((computedObservables[j]-exptUpperLimits[expt[j]-1])/exptUpperLimits[expt[j]-1])**2
-            #print(computedObservables[j],exptUpperLimits[expt[j]-1],chisq)
-            print(expt[j],chisq)
+            #print(expt[j],computedObservables[j],exptUpperLimits[expt[j]-1],chisq)
+            #print(expt[j],chisq)
     chisqArray.append(chisq)
-    #a = 1/0
+    #if simulMin == False:
+      #a = 1/0
   chisqDict[threadFirstLast[0]] = chisqArray
   return 
 
@@ -256,6 +260,8 @@ if(simulMin == True):
   targetCorr = gm.getCorrFile(targetINTIinp)
 else:
   normalizingExpts,normalizingFactors = gm.getScalingFactors()
+  integratedRutherford = gm.getIntegratedRutherford()
+  averageAngle = gm.getAverageAngle()
   rawYields,rawUncertainties = gm.getRawYields()
 
 #Get experimental observables and the beam and target maps
@@ -285,6 +291,8 @@ neighborsArray = [20,30,40,60,80,120,160]
 if os.path.exists("checkpoint_%i" % batchNumber):
   f = open("checkpoint_%i/psoSaveIterAndCost.csv" % batchNumber)
   iterStart = int(f.readline().strip()) + 1
+  if iterStart > iterSwitch:
+    my_topology = Star()
   my_swarm.best_cost = float(f.readline().strip())
   f.close()
   my_swarm.position = np.loadtxt('checkpoint_%i/psoSavePositions.csv' % batchNumber,delimiter=',')

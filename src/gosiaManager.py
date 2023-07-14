@@ -32,7 +32,7 @@ class gosiaManager:
     else:
       raise Exception("ERROR: Config file is not readable!")
     
-    expectedFromConfig = ["gosia","gosia2","beamINTIinp","beamMAPinp","beamPOINinp","beam_bst","beamYields","rawBeamYields","scratchDirectory","simulMin","nThreads","nBeamParams"]
+    expectedFromConfig = ["gosia","beamINTIinp","beamMAPinp","beamPOINinp","beam_bst","beamYields","rawBeamYields","scratchDirectory","simulMin","nThreads","nBeamParams"]
     if "simulMin" in self.configDict.keys():
       if self.configDict["simulMin"] == True:
         expectedFromConfig += ["targetINTIinp","targetMAPinp","targetPOINinp","target_bst","targetYields","rawTargetYields","nTargetParams"]
@@ -109,6 +109,7 @@ class gosiaManager:
     beamMatrixElements = pd.DataFrame({"Multipolarity" : Multipolarity, "StateI" : StateI, "StateF" : StateF, "LoBound" : LoBound, "HiBound" : HiBound})
     return beamMatrixElements
 
+  """
   #Finds the number of degrees of freedom from a given input and yields file (to get total dof, run this twice, once for the beam and once for the target)    
   def findDof(self,input_file,yields_file):
     dofcount = 0
@@ -151,6 +152,7 @@ class gosiaManager:
     chisq = float(line.strip().split("***")[1].split("=")[1])
     f.close()
     return chisq
+  """
 
   #Makes a new .bst file using the matrix elements passed to it
   def make_bst(self,bst_file,matrixElements):
@@ -171,6 +173,7 @@ class gosiaManager:
     f.close()
     return mes
   
+  """
   def findChisqContributions(self,output_file):
     f = open(output_file,'r')
     line = f.readline()
@@ -249,6 +252,7 @@ class gosiaManager:
       line = f.readline()
     f.close()
     return sigmas
+  """
 
   #Gets the relevant observables from the experiment (corrected yields and comparisons to literature)
   #Requires corrected yields and POIN input for both beam and target
@@ -499,14 +503,14 @@ class gosiaManager:
       line = f.readline()
     return corrections
 
-  #Reads the upper limits for transitions from the GOSIA input file. Requires YNRM and UPL flags to be set in the input file.
+  #Reads the upper limits for transitions from the GOSIA input file. Requires NS and UPL flags to be set in the input file.
   def getUpperLimits(self,beamExptMap,targetExptMap,observables):
     beamUpperLimits = []
     
     f = open(self.configDict["beamPOINinp"],'r')
     line = f.readline()
     while line:
-      if '!YNRM' in line:
+      if '!NS' in line:
         splitline = line.strip().split("!")[0].split(",")
         ynrm = (int(splitline[0]),int(splitline[1]))
       elif '!UPL' in line:
@@ -643,3 +647,30 @@ class gosiaManager:
     f.close()
 
     return rawYields, rawUncertainties
+
+  def getIntegratedRutherford(self):
+    intiOut = self.getOutputFile(self.configDict["beamINTIinp"])
+    f = open(intiOut,'r')
+    integratedRutherford = []
+    line = f.readline()
+    while line:
+      if "INTEGRATED RUTHERFORD" in line:
+        integratedRutherford.append(float(line.split("=")[1].split()[0]))
+      line = f.readline()
+
+    return integratedRutherford
+
+  def getAverageAngle(self):
+    f = open(self.configDict["beamPOINinp"],'r')
+    averageAngle = []
+    line = f.readline()
+    while line:
+      if "EXPT" in line:
+        line = f.readline()
+        nExpt = int(line.split(',')[0])
+        for i in range(nExpt):
+          line = f.readline()
+          averageAngle.append(abs(float(line.split(',')[3])))
+      line = f.readline()
+
+    return averageAngle
