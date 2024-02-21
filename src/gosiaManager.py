@@ -674,3 +674,14 @@ class gosiaManager:
       line = f.readline()
 
     return averageAngle
+
+  def getDsig(self,output_file):
+    f = open(output_file)
+    dsig = []
+    line = f.readline()
+    while line:
+      if "DSIG VALUE" in line:
+        dsig.append(float(line.split("=")[1].split()[0]))
+      line = f.readline()
+
+    return dsig

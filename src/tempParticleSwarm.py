@@ -100,57 +100,57 @@ def getSwarmChisq(positions,iteration,nThreads=1):
 #computes the chisq values.
 def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
   chisqArray = []
-  #Loop over the particles managed by this thread
   for i in range(threadFirstLast[0],threadFirstLast[1]):
-    #Make a .bst file containing the matrix elements for the beam, and for the target if applicable
-    gm.make_bst(os.path.join(chainDir,beam_bst),positions[i][:nBeamParams])
-    if simulMin == True:
-      gm.make_bst(os.path.join(chainDir,target_bst),positions[i][nBeamParams:])
-    #Run GOSIA in the appropriate subdirectory, then get the observables from the output file.
+    #print(positions[i])
+    #gm.make_bst(os.path.join(chainDir,beam_bst),positions[i][:nBeamParams])
+    #if simulMin == True:
+      #gm.make_bst(os.path.join(chainDir,beam_bst),positions[i][:nBeamParams])
+      #gm.make_bst(os.path.join(chainDir,target_bst),positions[i][nBeamParams:])
     gm.runGosiaInDir(beamPOINinp,chainDir)
     beamOutputFile = os.path.join(chainDir,gm.getOutputFile(beamPOINinp))
     computedObservables = gm.getPOINobservables(beamOutputFile)
-    #Repeat the previous step for the target, if applicable.
     if simulMin == True:
       gm.runGosiaInDir(targetPOINinp,chainDir)
       targetOutputFile = os.path.join(chainDir,gm.getOutputFile(targetPOINinp))
       computedObservables += gm.getPOINobservables(targetOutputFile)
-    #expt stores the GOSIA experiment number associated with each observable. For literature constraints, the experiment number is set to 0.
     expt = []
     for j in range(len(beamExptMap)):
       expt.append(beamExptMap[j][0])
     for j in range(len(targetExptMap)):
       expt.append(targetExptMap[j][0])
     nExpt = max(expt)
-    #Compute the scaling factors. These are computed the same way that GOSIA computes them: by finding the value that minimizes the chi-squared value for the relevant experiment or experiments.
     scalingFactors = [0]*nExpt
+    dTheta = [10.247,8.317,6.626,5.271,1.0,1.0,1.0,13.23,9.92,7.31,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0]
+    #if simulMin == False:
+      #for j in range(nExpt):
+        #for k in range(len(expt)):
+          #if expt[k] == j+1:
+            #computedObservables[k] *= normalizingFactors[j]**2
     for j in range(nExpt):
-      if simulMin == True:
+      if simulMin == True:# or normalizingExpts[j] >= 0:
         tempSum1 = 0
         tempSum2 = 0
         for k in range(len(expt)):
           if expt[k] == j+1 and observables[k] != 0:
+            #print(expt[k],observables[k],computedObservables[k],uncertainties[k])
             tempSum1 += (observables[k]*computedObservables[k])/uncertainties[k]**2
             tempSum2 += computedObservables[k]**2/uncertainties[k]**2
         scalingFactor = tempSum1/tempSum2
         scalingFactors[j] = scalingFactor
-      #If doing beam-only minimization, we can have coupled experiments. Note that the coupling constants in the input file should not be the same as the experiment you are trying to match.
-      #GOSIA is a black box when it comes to these constants, and I haven't been able to determine how they are used. The only way to make this work is to tune the coupling constants such that
-      #the yields match the output from standalone GOSIA for the same matrix elements. Anecdotally, I found that the coupling constants for the experiment I tested this on needed to be close to
-      #1, but I can't guarantee this is always the case. 
       else:
         tempSum1 = 0
         tempSum2 = 0
         for k in range(len(expt)):
           if normalizingExpts[expt[k]-1] == j+1 and observables[k] != 0 and expt[k] != 0:
             tempSum1 += (observables[k]*computedObservables[k]*normalizingFactors[expt[k]-1])/uncertainties[k]**2
-            tempSum2 += (computedObservables[k]**2*normalizingFactors[expt[k]-1]**2)/uncertainties[k]**2
+            tempSum2 += (computedObservables[k]*normalizingFactors[expt[k]-1])**2/uncertainties[k]**2
+        print(tempSum1,tempSum2)
         if tempSum2 != 0:
           scalingFactor = tempSum1/tempSum2
           for k in range(len(normalizingExpts)):
             if normalizingExpts[k] == j+1:
               scalingFactors[k] = scalingFactor*normalizingFactors[k]
-    #Multiply the computed observables by the scaling factors
+    print(scalingFactors)
     for j in range(nExpt):
       for k in range(len(expt)):
         if expt[k] == j+1:
@@ -160,7 +160,7 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
     for j in range(nObservables):
       if observables[j] != 0:
         chisq += ((computedObservables[j]-observables[j])/uncertainties[j])**2
-        #print(expt[j],computedObservables[j],observables[j],uncertainties[j],chisq)
+        print(expt[j],computedObservables[j],observables[j],uncertainties[j],chisq)
         #print(expt[j],chisq)
       elif expt[j] != 0:
         if simulMin == True:
@@ -174,8 +174,8 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
             #print(expt[j],computedObservables[j],exptUpperLimits[expt[j]-1],chisq)
             #print(expt[j],chisq)
     chisqArray.append(chisq)
-    #if simulMin == False:
-      #a = 1/0
+    if simulMin == False:
+      a = 1/0
   chisqDict[threadFirstLast[0]] = chisqArray
   return 
 
@@ -204,10 +204,6 @@ if "nParticles" in gm.configDict.keys():
   nParticles = int(gm.configDict["nParticles"])
 else:
   nParticles = 600
-if "nIterations" in gm.configDict.keys():
-  nIterations = int(gm.configDict["nIterations"])
-else:
-  nIterations = 500
 if "cognitiveCoeff" in gm.configDict.keys():
   cognitiveCoeff = float(gm.configDict["cognitiveCoeff"])
 else:
@@ -247,12 +243,16 @@ paramBounds = (loBounds,hiBounds)
 #Run GOSIA to initialize everything. This is the only time INTI will be run, so use a
 #reasonable initial guess. If you don't have one, you can always run with a bad one and 
 #use this program to try to get a better initial guess. 
+#gm.runGosia2(beamINTIinp)
+#gm.runGosia2(targetINTIinp)
+#gm.runGosia(beamMAPinp)
+#gm.runGosia(targetMAPinp)
 beamCorr = gm.getCorrFile(beamINTIinp)
 if(simulMin == True):
   targetCorr = gm.getCorrFile(targetINTIinp)
 else:
   normalizingExpts,normalizingFactors = gm.getScalingFactors()
-  #gm.runGosia(beamPOINinp)
+  gm.runGosia(beamPOINinp)
   beamPOINout = gm.getOutputFile(beamPOINinp)
   dsig = gm.getDsig(beamPOINout)
   averageAngle = gm.getAverageAngle()
@@ -261,8 +261,9 @@ else:
 
 #Get experimental observables and the beam and target maps
 observables,uncertainties,beamExptMap,targetExptMap = gm.getExperimentalObservables()
+#observables[0:288] = rawYields
+#uncertainties[0:288] = rawUncertainties
 exptUpperLimits = gm.getUpperLimits(beamExptMap,targetExptMap,observables)
-
 #Initialize the particle swarm
 #Papers I read suggested that VonNeumann is typically the best topology. With this many 
 #dimensions, Star is equivalent to VonNeumann. I found the best approach was to start with a
@@ -278,12 +279,9 @@ my_topology = Ring(static=False)
 my_options = {'c1' : cognitiveCoeff, 'c2' : socialCoeff, 'w' : inertialCoeff}
 my_swarm = P.create_swarm(n_particles=nParticles,dimensions=nDimensions,bounds=paramBounds,options=my_options)
 
-#Set the parameters for the adaptive topology
 iterSwitch = 350
 neighborsArray = [20,30,40,60,80,120,160]
 
-#We use a checkpointing system that saves the state of the graph at each iteration so that
-#jobs can be run on a scavenger queue or otherwise interupted and resumed. 
 if os.path.exists("checkpoint_%i" % batchNumber):
   f = open("checkpoint_%i/psoSaveIterAndCost.csv" % batchNumber)
   iterStart = int(f.readline().strip()) + 1
@@ -299,7 +297,8 @@ if os.path.exists("checkpoint_%i" % batchNumber):
 else:
   os.mkdir("checkpoint_%i" % batchNumber)
   iterStart = 0
-for i in range(iterStart,nIterations):
+iterations = 500
+for i in range(iterStart,iterations):
   if i == iterSwitch:
     my_topology = Star()
   
@@ -336,7 +335,7 @@ for i in range(iterStart,nIterations):
   else:
     my_swarm.velocity = my_topology.compute_velocity(my_swarm)
     my_swarm.position = my_topology.compute_position(my_swarm,bounds=paramBounds,bh=boundaryHandler)
-  if i != nIterations-1:
+  if i != iterations-1:
     np.savetxt('checkpoint_%i/psoSavePositions.csv' % batchNumber,my_swarm.position,delimiter=',')
     np.savetxt('checkpoint_%i/psoSaveVelocities.csv' % batchNumber,my_swarm.velocity,delimiter=',')
     np.savetxt('checkpoint_%i/psoSavePBestPos.csv' % batchNumber,my_swarm.pbest_pos,delimiter=',')
