@@ -7,12 +7,14 @@ import subprocess
 
 class gosiaManager:
 
+
+  #Initialize gosiaManager by reading in the user-specified parameters from the config file.
   def __init__(self,config):
     if os.path.isfile(config):
       f = open(config,'r')
       self.configDict = {}
-      integerArguments = ["nThreads","nBeamParams","nTargetParams"]
-      booleanArguments = ["simulMin"]
+      integerArguments = ["nThreads","nBeamParams","nTargetParams","annealingLayers"]
+      booleanArguments = ["simulMin","parallelAnnealing"]
       line = f.readline()
       while line:
         splitline = line.split('=')
@@ -24,7 +26,7 @@ class gosiaManager:
           elif splitline[1].strip() == "False":
             self.configDict[splitline[0].strip()] = False
           else:
-            raise Exception("ERROR: simulMin must be True or False!")
+            raise Exception("ERROR: %s must be True or False!" % splitline[0].strip())
         else:
           self.configDict[splitline[0].strip()] = splitline[1].strip()
         line = f.readline()
@@ -32,51 +34,143 @@ class gosiaManager:
     else:
       raise Exception("ERROR: Config file is not readable!")
     
-    expectedFromConfig = ["gosia","beamINTIinp","beamMAPinp","beamPOINinp","beam_bst","beamYields","rawBeamYields","scratchDirectory","simulMin","nThreads","nBeamParams"]
+    #expectedFromConfig = ["gosia","beamINTIinp","beamMAPinp","beamPOINinp","beam_bst","beamYields","rawBeamYields","scratchDirectory","simulMin","nThreads","nBeamParams"]
+    expectedFromConfig = ["gosia","beamINTIinp","beamPOINinp","beamYields","scratchDirectory","simulMin","nThreads","nBeamParams"]
     if "simulMin" in self.configDict.keys():
       if self.configDict["simulMin"] == True:
-        expectedFromConfig += ["targetINTIinp","targetMAPinp","targetPOINinp","target_bst","targetYields","rawTargetYields","nTargetParams"]
+        #expectedFromConfig += ["targetINTIinp","targetMAPinp","targetPOINinp","target_bst","targetYields","rawTargetYields","nTargetParams"]
+        expectedFromConfig += ["targetINTIinp","targetPOINinp","targetYields","nTargetParams"]
     else:
       raise Exception("ERROR: Variable simulMin not in config file! Please set to true for simultaneous beam/target minimization and false otherwise.")
     for key in expectedFromConfig:
       if key not in self.configDict.keys():
         raise Exception("ERROR: Variable %s not in config file!" % key)
+
+    f = open(self.configDict["beamINTIinp"],'r')
+    line = f.readline()
+    while line[:2] != "4,":
+      line = f.readline()
+      if "OP,TITL" in line:
+        raise Exception("ERROR: Corrected yields file not located in GOSIA input file %s" % self.configDict["beamINTIinp"])
+    self.configDict["beamCorr"] = f.readline()[:-1]
+    f.close()
+
+    f = open(self.configDict["beamPOINinp"],'r')
+    line = f.readline()
+    while "OP,TITL" not in line:
+      if line[:3] == "22,":
+        self.configDict["beamPOINout"] = f.readline()[:-1]
+      elif line[:2] == "7,":
+        self.configDict["beamMAPinp"] = f.readline()[:-1]
+      elif line[:2] == "3,":
+        self.configDict["rawBeamYields"] = f.readline()[:-1]
+      elif line[:3] == "12,":
+        self.configDict["beam_bst"] = f.readline()[:-1]
+      line = f.readline()
+    f.close()
+    for key in ["beamPOINout","beamMAPinp","rawBeamYields","beam_bst"]:
+      if key not in self.configDict.keys():
+        raise Exception("ERROR: File %s not located in GOSIA input file %s" % (key,self.configDict["beamPOINinp"]))
+
+    if self.configDict["simulMin"] == True:
+      f = open(self.configDict["targetINTIinp"],'r')
+      line = f.readline()
+      while line[:2] != "4,":
+        line = f.readline()
+        if "OP,TITL" in line:
+          raise Exception("ERROR: Corrected yields file not located in GOSIA input file %s" % self.configDict["beamINTIinp"])
+      self.configDict["targetCorr"] = f.readline()[:-1]
+      f.close()
+
+      f = open(self.configDict["targetPOINinp"],'r')
+      line = f.readline()
+      while "OP,TITL" not in line:
+        if line[:3] == "22,":
+          self.configDict["targetPOINout"] = f.readline()[:-1]
+        elif line[:2] == "7,":
+          self.configDict["targetMAPinp"] = f.readline()[:-1]
+        elif line[:2] == "3,":
+          self.configDict["rawTargetYields"] = f.readline()[:-1]
+        elif line[:3] == "12,":
+          self.configDict["target_bst"] = f.readline()[:-1]
+        line = f.readline()
+      f.close()
+      for key in ["targetPOINout","targetMAPinp","rawTargetYields","target_bst"]:
+        if key not in self.configDict.keys():
+          raise Exception("ERROR: File %s not located in GOSIA input file %s" % (key,self.configDict["beamPOINinp"]))
+
+
+    return
+
   
   #Initializes the program by reading in the matrix elements and their properties
-  def setup(self): 
-    beamMatrixElements = getMatrixElements(self.configDict["beamPOINinp"])
-    targetMatrixElements = getMatrixElements(self.configDict["targetPOINinp"])
-    return beamMatrixElements,targetMatrixElements
+  #def setup(self): 
+    #beamMatrixElements = getMatrixElements(self.configDict["beamPOINinp"])
+    #targetMatrixElements = getMatrixElements(self.configDict["targetPOINinp"])
+    #return beamMatrixElements,targetMatrixElements
 
+  """
   #Gets the output file from a given input file
   def getOutputFile(self,input_file):
     f = open(input_file,'r')
     line = f.readline()
-    while line[:2] != "22":
+    while line[:3] != "22,":
       line = f.readline()
+      if "OP,TITL" in line:
+        raise Exception("ERROR: Output file not located in GOSIA input file %s" % input_file)
     output_file = f.readline()[:-1]
     f.close()
     return output_file
 
-#Gets the corrected yields file from a given input file
+  #Gets the corrected yields file from a given input file
   def getCorrFile(self,input_file):
     f = open(input_file,'r')
     line = f.readline()
     while line[:2] != "4,":
       line = f.readline()
+      if "OP,TITL" in line:
+        raise Exception("ERROR: Corr file not located in GOSIA input file %s" % input_file)
     output_file = f.readline()[:-1]
     f.close()
     return output_file
 
+  #Gets the file produced by OP,MAP
   def getMapFile(self,input_file):
     f = open(input_file,'r')
     line = f.readline()
     while line[:2] != "7,":
       line = f.readline()
+      if "OP,TITL" in line:
+        raise Exception("ERROR: Map file not located in GOSIA input file %s" % input_file)
     output_file = f.readline()[:-1]
     f.close()
     return output_file
 
+  #Gets the "raw" beam yields file (the version with the normal GOSIA format)
+  def getRawBeamYields(self,input_file):
+    f = open(input_file,'r')
+    line = f.readline()
+    while line[:2] != "3,":
+      line = f.readline()
+      if "OP,TITL" in line:
+        raise Exception("ERROR: Yields file not located in GOSIA input file %s" % input_file)
+    output_file = f.readline()[:-1]
+    f.close()
+    return output_file
+
+  #Gets the file containing the current matrix elements
+  def getBstFile(self,input_file):
+    f = open(input_file,'r')
+    line = f.readline()
+    while line[:3] != "12,":
+      line = f.readline()
+      if "OP,TITL" in line:
+        raise Exception("ERROR: Best fit matrix elements file not located in GOSIA input file %s" % input_file)
+    output_file = f.readline()[:-1]
+    f.close()
+    return output_file
+  """
+  
   #Reads in the matrix elements, multipolarities, and bounds from the GOSIA input file
   def getMatrixElements(self,input_file):
     f = open(input_file)
@@ -265,6 +359,8 @@ class gosiaManager:
     uncertainties = []
     beamExptMap = []
     targetExptMap = []
+    beamDoubletMap = {}
+    targetDoubletMap = {}
 
     expt = 0
     #parse the corrected yields file and store them, along with the exptMap
@@ -275,13 +371,28 @@ class gosiaManager:
       if len(splitline) == 7:
         expt = int(splitline[0])
       elif len(splitline) == 4:
-        beamExptMap.append((expt,int(splitline[0]),int(splitline[1])))
+        init = int(splitline[0])
+        final = int(splitline[1])
+        beamExptMap.append((expt,init,final))
+        """
+        if init >= 10000:
+          secondTransitionInit = ((init % 10000) - (init % 100))/100
+          secondTransitionFinal = ((final % 10000) - (final % 100))/100
+          thirdTransitionInit = init % 100
+          thirdTransitionFinal = final % 100
+          beamTripletMap[(secondTransitionInit,secondTransitionFinal)] = (init,final)
+          beamTripletMap[(thirdTransitionInit,thirdTransitionFinal)] = (init,final)
+        """
+        if init >= 100:
+          secondTransitionInit = init % 100
+          secondTransitionFinal = final % 100
+          beamDoubletMap[(secondTransitionInit,secondTransitionFinal)] = (init,final)
         observables.append(float(splitline[2]))
         uncertainties.append(float(splitline[3]))
       line = f.readline()
     f.close()
 
-    beamCorr = self.getCorrFile(self.configDict["beamINTIinp"])
+    beamCorr = self.configDict["beamCorr"]
 
     f = open(beamCorr,'r')
     line = f.readline()
@@ -351,13 +462,28 @@ class gosiaManager:
         if len(splitline) == 7:
           expt = int(splitline[0])
         elif len(splitline) == 4:
+          init = int(splitline[0])
+          final = int(splitline[1])
           targetExptMap.append((expt,int(splitline[0]),int(splitline[1])))
+          """
+          if init >= 10000:
+            secondTransitionInit = ((init % 10000) - (init % 100))/100
+            secondTransitionFinal = ((final % 10000) - (final % 100))/100
+            thirdTransitionInit = init % 100
+            thirdTransitionFinal = final % 100
+            targetTripletMap[(secondTransitionInit,secondTransitionFinal)] = (init,final)
+            targetTripletMap[(thirdTransitionInit,thirdTransitionFinal)] = (init,final)
+          """
+          if init >= 100:
+            secondTransitionInit = init % 100
+            secondTransitionFinal = final % 100
+            targetDoubletMap[(secondTransitionInit,secondTransitionFinal)] = (init,final)
           observables.append(float(splitline[2]))
           uncertainties.append(float(splitline[3]))
         line = f.readline()
       f.close()
 
-      targetCorr = self.getCorrFile(self.configDict["targetINTIinp"])
+      targetCorr = self.configDict["targetCorr"]
 
       f = open(targetCorr,'r')
       line = f.readline()
@@ -417,13 +543,11 @@ class gosiaManager:
         line = f.readline()
       f.close()
 
-    return observables,uncertainties,beamExptMap,targetExptMap
+    return observables,uncertainties,beamExptMap,targetExptMap,beamDoubletMap,targetDoubletMap
     
   #Does the same thing as getExperimentalObservables, but for the results simulated in OP,POIN
-  def getPOINobservables(self,output_file):
+  def getPOINobservables(self,output_file,exptMap,doubletMap):
     computedObservables = []
-    #corrections = getCorr(inti_out_file)
-    #corrected = 0
     
     f = open(output_file,'r')
     line = f.readline()
@@ -439,14 +563,37 @@ class gosiaManager:
           splitline = line.split()
           init = int(splitline[0])
           final = int(splitline[1])
-          #if(expt,init,final) in exptMap or (expt,final,init) in exptMap:
-          #GOSIA removes the E from scientific notation if the exponent is 3 digits. Added this try-except block to account for that.
-          try:
-            computedObservables.append(float(splitline[4]))
-          except:
-            splitagain = splitline[4].split('+')
-            withE = splitagain[0] + "E+" + splitagain[1]
-            computedObservables.append(float(withE))
+
+          #Check if this transition is the second listed transition in a doublet pair.
+          #If it is, we will add its counts to its pair's instead of treating it as a separate observable.
+          if (init,final) in doubletMap.keys() or (final,init) in doubletMap.keys():
+            #The value associated with the index tuple key is the tuple that appears in exptMap for the combined doublet.
+            #We will get the index of this tuple in the exptMap and then add the counts for this observable to that one.
+            try:
+              doubletPair = doubletMap[(init,final)]
+            except:
+              doubletPair = doubletMap[(final,init)]
+            if (expt,doubletPair[0],doubletPair[1]) in exptMap:
+              exptIndex = exptMap.index((expt,doubletPair[0],doubletPair[1]))
+            elif (expt,doubletPair[1],doubletPair[0]) in exptMap:
+              exptIndex = exptMap.index((expt,doubletPair[1],doubletPair[0]))
+            else:
+              raise Exception("Error in function getPOINobservables: the transition from %i to %i is not in the experiment map." % (init,final))
+            #GOSIA removes the E from scientific notation if the exponent is 3 digits. Added this try-except block to account for that.
+            try:
+              computedObservables[exptIndex] += float(splitline[4])
+            except:
+              splitagain = splitline[4].split('+')
+              withE = splitagain[0] + "E+" + splitagain[1]
+              computedObservables[exptIndex] += float(withE)
+          #If the transition is not the second listed transition in a doublet, we just append the observable to the list.
+          else:
+            try:
+              computedObservables.append(float(splitline[4]))
+            except:
+              splitagain = splitline[4].split('+')
+              withE = splitagain[0] + "E+" + splitagain[1]
+              computedObservables.append(float(withE))
           line = f.readline()
       if "EXP. AND CALCULATED BRANCHING RATIOS" in line:
         for i in range(5):
@@ -486,6 +633,7 @@ class gosiaManager:
       line = f.readline()
     return computedObservables
 
+  """
   #Gets the cor.f correction factors from the intiInp file
   def getCorr(self,output_file):
     corrections = []
@@ -502,6 +650,7 @@ class gosiaManager:
           line = f.readline()
       line = f.readline()
     return corrections
+  """
 
   #Reads the upper limits for transitions from the GOSIA input file. Requires NS and UPL flags to be set in the input file.
   def getUpperLimits(self,beamExptMap,targetExptMap,observables):
@@ -530,7 +679,7 @@ class gosiaManager:
       f = open(self.configDict["targetPOINinp"],'r')
       line = f.readline()
       while line:
-        if '!YNRM' in line:
+        if '!NS' in line:
           splitline = line.strip().split("!")[0].split(",")
           ynrm = (int(splitline[0]),int(splitline[1]))
         elif '!UPL' in line:
@@ -565,16 +714,14 @@ class gosiaManager:
     shutil.copy(self.configDict["beamPOINinp"],chainDir)
     shutil.copy(self.configDict["rawBeamYields"],chainDir)
     shutil.copy(self.configDict["beam_bst"],chainDir)
-    shutil.copy(self.getMapFile(self.configDict["beamPOINinp"]),chainDir)
-    shutil.copy(self.getCorrFile(self.configDict["beamPOINinp"]),chainDir)
+    shutil.copy(self.configDict["beamCorr"],chainDir)
     if self.configDict["simulMin"] == True:
       shutil.copy(self.configDict["targetINTIinp"],chainDir)
       shutil.copy(self.configDict["targetMAPinp"],chainDir)
       shutil.copy(self.configDict["targetPOINinp"],chainDir)
       shutil.copy(self.configDict["rawTargetYields"],chainDir)
       shutil.copy(self.configDict["target_bst"],chainDir)
-      shutil.copy(self.getMapFile(self.configDict["targetPOINinp"]),chainDir)
-      shutil.copy(self.getCorrFile(self.configDict["targetPOINinp"]),chainDir)
+      shutil.copy(self.configDict["targetCorr"],chainDir)
     return chainDirPrefix
 
   def removeSubDirectories(self,chainNum):
@@ -585,29 +732,29 @@ class gosiaManager:
     return
 
   def runGosia(self,input_file):
-    outputFile = self.getOutputFile(input_file)
     with open(input_file) as f:
         subprocess.run([self.configDict["gosia"]], stdin=f, stdout=subprocess.DEVNULL)
-    return outputFile
+    return 
     
+  """
   def runGosia2(self,input_file):
-    outputFile = self.getOutputFile(input_file)
     with open(input_file) as f:
         subprocess.run([self.configDict["gosia2"]], stdin=f, stdout=subprocess.DEVNULL)
-    return outputFile
+    return 
+  """
 
   def runGosiaInDir(self,input_file,dir):
-    outputFile = self.getOutputFile(input_file)
     with open(input_file) as f:
         subprocess.run([self.configDict["gosia"]], stdin=f, stdout=subprocess.DEVNULL, cwd=dir)
-    return outputFile
+    return 
 
+  """
   def runGosia2InDir(self,input_file,dir):
-    outputFile = self.getOutputFile(input_file)
     with open(input_file) as f:
         subprocess.run([self.configDict["gosia2"]], stdin=f, stdout=subprocess.DEVNULL, cwd=dir)
-    return outputFile
-  
+    return 
+  """  
+
   def getScalingFactors(self):
     f = open(self.configDict["beamPOINinp"])
     exptScaledTo = []
@@ -629,6 +776,7 @@ class gosiaManager:
       line = f.readline()
     return exptScaledTo, exptScalingFactors
 
+  """
   def getRawYields(self):
     rawYields = []
     rawUncertainties = []
@@ -647,7 +795,8 @@ class gosiaManager:
     f.close()
 
     return rawYields, rawUncertainties
-
+  """
+  """
   def getIntegratedRutherford(self):
     intiOut = self.getOutputFile(self.configDict["beamINTIinp"])
     f = open(intiOut,'r')
@@ -659,6 +808,7 @@ class gosiaManager:
       line = f.readline()
 
     return integratedRutherford
+  """
 
   def getAverageAngle(self):
     f = open(self.configDict["beamPOINinp"],'r')

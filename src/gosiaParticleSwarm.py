@@ -56,13 +56,19 @@ to get it to read your input file properly.
 import numpy as np
 import pyswarms.backend as P
 import gosiaManager
+from Modified_Ring import Modified_Ring
 from pyswarms.backend.topology import Ring
 from pyswarms.backend.topology import Star
 from pyswarms.backend.handlers import VelocityHandler
 from pyswarms.backend.handlers import BoundaryHandler
-import threading
+from mpi4py import MPI
 import os
 import sys
+
+
+#Initialize the message passing interface. Rank 0 will act as the director and coordinate between the ranks, while other ranks will be used to divide up evaluating the candidate solutions.
+comm = MPI.COMM_WORLD
+rank = comm.Get_rank()
 
 #Takes an integer as an argument. Only effects where the name of the output file and the temp 
 #directories for running GOSIA by default. Useful for running many instances in parallel.
@@ -70,35 +76,43 @@ import sys
 configFile = sys.argv[1]
 batchNumber = int(sys.argv[2])
 
-#Initializes the process of computing the particle chisq values, including dividing up the 
-#particles between multiple threads.
-def getSwarmChisq(positions,iteration,nThreads=1):
-  particlesPerThread = int(np.ceil(len(positions)/nThreads))
+#This function is called by rank 0 during each iteration of the optimization. It handles dividing up the particles between the other threads and sending the relevant information to those threads. 
+#getSwarmChisq takes three arguments: the particle positions, the terminate flag (which instructs the other threads to shut down when the optimization is complete), and the number of threads to be used. 
+#The default number of threads is 21, with one thread serving as the director and the rest evaluating the candidate solutions. Because the first thread is always the director, this program requires at least
+#two threads to run. However, it is recommended that more threads are used for decreased computation time. With default settings (and no parallel annealing), this program takes approximately 6 hours to complete
+#when using 21 threads. 
+def getSwarmChisq(positions,terminate,nThreads=21):
+  #Divide up the total number of particles as evenly as possible between the threads. Create a list (threadFirstLast) which stores tuples containing the first and the (non-inclusive) last particle to be evaluated
+  #by each third.
+  particlesPerThread = int(np.ceil(len(positions)/(nThreads-1)))
   threadFirstLast = []
-  folderStart = batchNumber*nThreads
-  for j in range(nThreads):
+  folderStart = batchNumber*(nThreads-1)
+  for j in range(nThreads-1):
     chainDirPrefix = gm.createSubDirectories(folderStart + j)
     threadFirstLast.append((particlesPerThread*j,min(particlesPerThread*(j+1),len(positions))))
   
-  chisqDict = {}
-  tmpChisqArray = []
-  for j in range(nThreads):
+  #For each non-director thread, we send four messages containing the particle position array, the flag which tells the threads whether or not to terminate, the threadFirstLast array, and the name of the directory
+  #where that thread's GOSIA instance will run.
+  for j in range(nThreads-1):
     chainDir = chainDirPrefix + str(folderStart + j)
-    tmpChisqArray.append(threading.Thread(target=getParticleChisq, args=[positions,iteration,threadFirstLast[j],chainDir,chisqDict], name='t%i' % j))
-    tmpChisqArray[j].start()
-
-  for j in range(nThreads):
-    tmpChisqArray[j].join()
+    comm.send(positions,dest=j+1)
+    comm.send(terminate,dest=j+1)
+    comm.send(threadFirstLast[j],dest=j+1)
+    comm.send(chainDir,dest=j+1)
   
+  #For each non-director thread, we expect to receive one message in return, which contains the chisq values for each evaluated candidate solution. The message passing interface will wait until each expected message
+  #is received before progressing.
   chisqArray = []
-  for firstLast in threadFirstLast:
-    chisqArray += chisqDict[firstLast[0]]
+  for j in range(nThreads-1):
+    threadChisqArray = comm.recv(source=j+1)
+    chisqArray += threadChisqArray
   chisqArray = np.array(chisqArray)
   return chisqArray
-  
-#Each thread calls this function once. Loops over all particles assigned to that thread and
-#computes the chisq values.
-def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
+
+#This function is called by the 'worker' ranks (every thread except the rank 0 director) to evaluate the candidate solutions for the subset of particles assigned to that thread. It takes as arguments the positions
+#array, the tuple containing the span of particles the thread is responsible for, and the name of the directory where the thread will run GOSIA. It returns an array of chisq values for the evaluated candidate
+#solutions, which is then sent back to rank 0 through the message passing interface.
+def getParticleChisq(positions,threadFirstLast,chainDir):
   chisqArray = []
   #Loop over the particles managed by this thread
   for i in range(threadFirstLast[0],threadFirstLast[1]):
@@ -108,13 +122,13 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
       gm.make_bst(os.path.join(chainDir,target_bst),positions[i][nBeamParams:])
     #Run GOSIA in the appropriate subdirectory, then get the observables from the output file.
     gm.runGosiaInDir(beamPOINinp,chainDir)
-    beamOutputFile = os.path.join(chainDir,gm.getOutputFile(beamPOINinp))
-    computedObservables = gm.getPOINobservables(beamOutputFile)
+    beamOutputFile = os.path.join(chainDir,gm.configDict["beamPOINout"])
+    computedObservables = gm.getPOINobservables(beamOutputFile,beamExptMap,beamDoubletMap)
     #Repeat the previous step for the target, if applicable.
     if simulMin == True:
       gm.runGosiaInDir(targetPOINinp,chainDir)
-      targetOutputFile = os.path.join(chainDir,gm.getOutputFile(targetPOINinp))
-      computedObservables += gm.getPOINobservables(targetOutputFile)
+      targetOutputFile = os.path.join(chainDir,gm.configDict["targetPOINout"])
+      computedObservables += gm.getPOINobservables(targetOutputFile,targetExptMap,targetDoubletMap)
     #expt stores the GOSIA experiment number associated with each observable. For literature constraints, the experiment number is set to 0.
     expt = []
     for j in range(len(beamExptMap)):
@@ -134,10 +148,8 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
             tempSum2 += computedObservables[k]**2/uncertainties[k]**2
         scalingFactor = tempSum1/tempSum2
         scalingFactors[j] = scalingFactor
-      #If doing beam-only minimization, we can have coupled experiments. Note that the coupling constants in the input file should not be the same as the experiment you are trying to match.
-      #GOSIA is a black box when it comes to these constants, and I haven't been able to determine how they are used. The only way to make this work is to tune the coupling constants such that
-      #the yields match the output from standalone GOSIA for the same matrix elements. Anecdotally, I found that the coupling constants for the experiment I tested this on needed to be close to
-      #1, but I can't guarantee this is always the case. 
+      #If doing beam- (or target-) only minimization, we can have coupled experiments. The normalizingExpts array, which is populated during initialization if simulMin is False, tracks the experiment number to which each 
+      #experiment is normalized. The normalizingFactors array, populated at the same time as normalizingArray, tracks the normalizing factor associated with each experiment. 
       else:
         tempSum1 = 0
         tempSum2 = 0
@@ -155,14 +167,17 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
       for k in range(len(expt)):
         if expt[k] == j+1:
           computedObservables[k] *= scalingFactors[j]
+    #Compute the chisq value from the computed and experimental observables and the experimental uncertainties
     nObservables = len(observables)
     chisq = 0
     for j in range(nObservables):
-      if observables[j] != 0:
+      #If the observable is set to 0, it is an unobserved transition and does not contribute to the chisq unless the computed observable exceeds the upper limit for the transition. Upper limits are stored in 
+      #exptUpperLimits and set during initialization.
+      if observables[j] != 0: 
         chisq += ((computedObservables[j]-observables[j])/uncertainties[j])**2
-        #print(expt[j],computedObservables[j],observables[j],uncertainties[j],chisq)
-        #print(expt[j],chisq)
       elif expt[j] != 0:
+        #If we are doing simultaneous minimization, we need to determine if the observable is associated with the beam or the target so we know which upper limit to use. If the computed observable exceeds the upper
+        #limit, we add a chisq contribution as though the observable was at the upper limit. 
         if simulMin == True:
           if j < len(beamExptMap) and computedObservables[j] >= exptUpperLimits[expt[j]-1][0]:
             chisq += ((computedObservables[j]-exptUpperLimits[expt[j]-1][0])/exptUpperLimits[expt[j]-1][0])**2
@@ -171,35 +186,28 @@ def getParticleChisq(positions,iteration,threadFirstLast,chainDir,chisqDict):
         else:
           if j < len(beamExptMap) and computedObservables[j] >= exptUpperLimits[expt[j]-1]:
             chisq += ((computedObservables[j]-exptUpperLimits[expt[j]-1])/exptUpperLimits[expt[j]-1])**2
-            #print(expt[j],computedObservables[j],exptUpperLimits[expt[j]-1],chisq)
-            #print(expt[j],chisq)
     chisqArray.append(chisq)
-    #if simulMin == False:
-      #a = 1/0
-  chisqDict[threadFirstLast[0]] = chisqArray
-  return 
+  return chisqArray
+
+
 
 #Initializes everything
 gm = gosiaManager.gosiaManager(configFile)
 
 #Store important parameters from the config file
 simulMin = gm.configDict["simulMin"]
-beamINTIinp = gm.configDict["beamINTIinp"]
-beamMAPinp = gm.configDict["beamMAPinp"]
 beamPOINinp = gm.configDict["beamPOINinp"]
 nBeamParams = gm.configDict["nBeamParams"]
 beam_bst = gm.configDict["beam_bst"]
 nDimensions = nBeamParams
 if simulMin == True:
-  targetINTIinp = gm.configDict["targetINTIinp"]
-  targetMAPinp = gm.configDict["targetMAPinp"]
   targetPOINinp = gm.configDict["targetPOINinp"]
   nTargetParams = gm.configDict["nTargetParams"]
   target_bst = gm.configDict["target_bst"]
   nDimensions += nTargetParams
 nThreads = gm.configDict["nThreads"] #number of threads used for particles
 
-#Sets the parameters of the particle swarm to the values I found to be optimal, unless other parameters are specified in the config file.
+#Set the parameters of the particle swarm to the values I found to be optimal, unless other parameters are specified in the config file.
 if "nParticles" in gm.configDict.keys():
   nParticles = int(gm.configDict["nParticles"])
 else:
@@ -228,6 +236,41 @@ if "boundaryStrategy" in gm.configDict.keys():
   boundaryHandler = boundaryHandler(strategy=gm.configDict["boundaryStrategy"])
 else:
   boundaryHandler = BoundaryHandler(strategy='reflective')
+if "parallelAnnealing" in gm.configDict.keys():
+  parallelAnnealing = gm.configDict["parallelAnnealing"]
+else:
+  parallelAnnealing = False
+if parallelAnnealing == True:
+  if "annealingLayers" in gm.configDict.keys():
+    annealingLayers = int(gm.configDict["annealingLayers"])
+  else:
+    annealingLayers = 5
+  if "annealingRates" in gm.configDict.keys():
+    annealingRates = gm.configDict["annealingRates"].split(",")
+    annealingRates = [float(x) for x in annealingRates]
+  else:
+    annealingRates = [0.3,0.4,0.5,0.6,0.7]
+  if "crossoverIterations" in gm.configDict.keys():
+    crossoverIterations = gm.configDict["crossoverIterations"].split(",")
+    crossoverIterations = [int(x) for x in crossoverIterations]
+  else:
+    crossoverIterations = [100,200,300,400]
+else:
+  annealingLayers = 1
+  annealingRates = [inertialCoeff]
+  crossoverIterations = []
+
+#Check if the number of annealing rates and crossover points (if applicable) matches the number of annealing layers. Only rank 0 performs this check to avoid repeat error messages.
+if rank == 0:
+  if len(annealingRates) != annealingLayers:
+    print("ERROR: Number of annealing layers is set to %i but %i annealing rates are specified." % annealingLayers,len(annealingRates))
+    sys.exit()
+  if annealingLayers > 1:
+    if len(crossoverIterations) < annealingLayers - 1:
+      print("WARNING: Number of crossovers is not sufficient to pass all particles through all annealing layers.")
+    elif len(crossoverIterations) > annealingLayers - 1:
+      print("WARNING: Number of crossovers is greater than the number of annealing layers - 1. This means that some particle swarms will pass through the same layer more than once.")
+
 
 #Gets the bounds for each matrix element from the INTI files.
 beamMatrixElements = gm.getMatrixElements(beamPOINinp)
@@ -244,114 +287,169 @@ else:
   hiBounds = beamHiBounds
 paramBounds = (loBounds,hiBounds)
 
-#Run GOSIA to initialize everything. This is the only time INTI will be run, so use a
-#reasonable initial guess. If you don't have one, you can always run with a bad one and 
-#use this program to try to get a better initial guess. 
-beamCorr = gm.getCorrFile(beamINTIinp)
-if(simulMin == True):
-  targetCorr = gm.getCorrFile(targetINTIinp)
-else:
+#If simulMin is false, we will need some additional information. The getScalingFactors function parses the GOSIA (beam) input file provided to determine which experiments are coupled to one another and what the
+#scaling factors are. This information is stored in the normalizingExpts and normalizingFactors arrays. The normalizing factors need to be scaled to match the computation done in GOSIA, and this requires the DSIG
+#parameter from GOSIA. Due to the difficulty of reading and understanding the GOSIA source code, I was not able to determine how DSIG is computed. Instead, I have included a modified version of gosia which writes
+#the DSIG values to the GOSIA output file, where they can be read by this program. If you are running with simulMin set to False, you will need to run the GOSIA input file once before starting this program so that
+#an output file with the DSIG parameters is available for parsing. 
+if(simulMin == False):
   normalizingExpts,normalizingFactors = gm.getScalingFactors()
-  #gm.runGosia(beamPOINinp)
-  beamPOINout = gm.getOutputFile(beamPOINinp)
-  dsig = gm.getDsig(beamPOINout)
+  dsig = gm.getDsig(gm.configDict["beamPOINout"])
   averageAngle = gm.getAverageAngle()
   for j in range(len(normalizingFactors)):
     normalizingFactors[j] /= (dsig[j]*np.sin(averageAngle[j]*np.pi/180.))
 
 #Get experimental observables and the beam and target maps
-observables,uncertainties,beamExptMap,targetExptMap = gm.getExperimentalObservables()
+observables,uncertainties,beamExptMap,targetExptMap,beamDoubletMap,targetDoubletMap = gm.getExperimentalObservables()
 exptUpperLimits = gm.getUpperLimits(beamExptMap,targetExptMap,observables)
 
-#Initialize the particle swarm
-#Papers I read suggested that VonNeumann is typically the best topology. With this many 
-#dimensions, Star is equivalent to VonNeumann. I found the best approach was to start with a
-#local topology (Ring) and increase the number of neighbors every 50 iterations until
-#eventually progressing to the Star topology. This allows the particles to first explore the
-#space near where they start and prevents premature convergence to a local minimum.
-my_topology = Ring(static=False) 
+if rank == 0:
+  #During the development of this program, I found the best approach was to start with a
+  #local topology (Ring) and increase the number of neighbors every 50 iterations until
+  #eventually progressing to the Star topology (fully connected). This allows the particles 
+  #to first explore the space near where they start and prevents premature convergence to a 
+  #local minimum. The "Modified_Ring" topology is identical to the ring topology except that 
+  #the output of the of the compute_gbest function is modified to better work with this program.
+  my_topology = Modified_Ring(static=False)
 
-#c1 is the cognitive parameter (velocity component towards particle's own best position)
-#c2 is the social parameter (velocity component towards best position of particle it can see)
-#c2 pulls towards global minimum in star topology since the graph is fully connected
-#w is the inertial parameter (velocity component in direction of last iteration's velocity)
-my_options = {'c1' : cognitiveCoeff, 'c2' : socialCoeff, 'w' : inertialCoeff}
-my_swarm = P.create_swarm(n_particles=nParticles,dimensions=nDimensions,bounds=paramBounds,options=my_options)
+  #c1 is the cognitive parameter (velocity component towards particle's own best position)
+  #c2 is the social parameter (velocity component towards best position of particle it can communicate with)
+  #c2 pulls towards global minimum in star topology since the graph is fully connected
+  #w is the inertial parameter (velocity component in direction of last iteration's velocity)
+  #The my_swarms array stores the particle swarm objects. If parallel annealing is not enabled, this 
+  #will be an array of length 1. 
+  my_swarms = []
+  for i in range(annealingLayers):
+    my_options = {'c1' : cognitiveCoeff, 'c2' : socialCoeff, 'w' : annealingRates[i]}
+    my_swarms.append(P.create_swarm(n_particles=nParticles,dimensions=nDimensions,bounds=paramBounds,options=my_options))
+    
+  #Set the parameters for the adaptive topology
+  iterSwitch = 350
+  neighborsArray = [20,30,40,60,80,120,160]
 
-#Set the parameters for the adaptive topology
-iterSwitch = 350
-neighborsArray = [20,30,40,60,80,120,160]
+  #We use a checkpointing system that saves the state of the graph at each iteration so that
+  #jobs can be run on a scavenger queue or otherwise interupted and resumed. 
+  if os.path.exists("checkpoint_%i/psoSaveIterAndCost_0.csv" % batchNumber):
+    #We save a separate set of checkpoint files for each annealing layer, so we loop over them here.
+    for j in range(annealingLayers):
+      f = open("checkpoint_%i/psoSaveIterAndCost_%i.csv" % (batchNumber,j))
+      #Get the current iteration number. If it is passed the switchover point to star topology, assign that topology here.
+      if j == 0:
+        iterStart = int(f.readline().strip()) + 1
+        if iterStart > iterSwitch:
+          my_topology = Star()
+      my_swarms[j].best_cost = float(f.readline().strip())
+      f.close()
+      #Load the parameters for this swarm
+      my_swarms[j].position = np.loadtxt('checkpoint_%i/psoSavePositions_%i.csv' % (batchNumber,j),delimiter=',')
+      my_swarms[j].velocity = np.loadtxt('checkpoint_%i/psoSaveVelocities_%i.csv' % (batchNumber,j),delimiter=',')
+      my_swarms[j].pbest_pos = np.loadtxt('checkpoint_%i/psoSavePBestPos_%i.csv' % (batchNumber,j),delimiter=',')
+      my_swarms[j].pbest_cost = np.loadtxt('checkpoint_%i/psoSavePBestCost_%i.csv' % (batchNumber,j),delimiter=',')
+      my_swarms[j].best_pos = np.loadtxt('checkpoint_%i/psoSaveBestPos_%i.csv' % (batchNumber,j),delimiter=',')  
+  #If we are not resuming a partially completed run and the checkpoint directory does not exist, create it here and initalize at iteration 0.
+  else:
+    if not os.path.exists("checkpoint_%i" % batchNumber):
+      os.mkdir("checkpoint_%i" % batchNumber)
+    iterStart = 0
+  
+  #Now we start the main part of of code: the for loop over the optimizer iterations.
+  for i in range(iterStart,nIterations):
+    #If we are at the switchover point to star topology, switch topologies. 
+    if i == iterSwitch:
+      my_topology = Star()
 
-#We use a checkpointing system that saves the state of the graph at each iteration so that
-#jobs can be run on a scavenger queue or otherwise interupted and resumed. 
-if os.path.exists("checkpoint_%i" % batchNumber):
-  f = open("checkpoint_%i/psoSaveIterAndCost.csv" % batchNumber)
-  iterStart = int(f.readline().strip()) + 1
-  if iterStart > iterSwitch:
-    my_topology = Star()
-  my_swarm.best_cost = float(f.readline().strip())
+    #If we have multiple annealing layers, check if we are at a crossover iteration. If we are, cycle the annealing layers.
+    if annealingLayers > 1:
+      if i in crossoverIterations:
+        tmp_swarms = my_swarms
+        for k in range(annealingLayers-1):
+          my_swarms[k+1] = tmp_swarms[k]
+          my_swarms[k].options = {'c1' : cognitiveCoeff, 'c2' : socialCoeff, 'w' : annealingRates[k]}
+        my_swarms[0] = tmp_swarms[-1]
+        my_swarms[0].options = {'c1' : cognitiveCoeff, 'c2' : socialCoeff, 'w' : annealingRates[0]}
+    
+    #Loop over our annealing layers
+    for k in range(annealingLayers):
+      #If we are on the final iteration and the final annealing layer, we set the terminate flag to "True" so the other ranks terminate after the final calculation.
+      if (i == nIterations - 1) and (k == annealingLayers - 1):
+        terminate = True
+      else:
+        terminate = False
+      #Evaluate the candidate solutions for each particle.
+      my_swarms[k].current_cost = getSwarmChisq(my_swarms[k].position,terminate,nThreads)
+    #initial best cost and best position for each particle 
+      if i == 0:
+        my_swarms[k].pbest_cost = my_swarms[k].current_cost
+        my_swarms[k].pbest_pos = my_swarms[k].position
+    #If it's not the first iteration, check if this position is better than particle's best
+    #and update if it is.
+      else:
+        for j in range(len(my_swarms[k].current_cost)):
+          if my_swarms[k].current_cost[j] <= my_swarms[k].pbest_cost[j]:
+            my_swarms[k].pbest_pos[j] = my_swarms[k].position[j]
+            my_swarms[k].pbest_cost[j] = my_swarms[k].current_cost[j]
+    #Track the global best cost
+      if np.min(my_swarms[k].pbest_cost) < my_swarms[k].best_cost:
+        if i < iterSwitch:
+          my_swarms[k].best_pos, my_swarms[k].best_cost = my_topology.compute_gbest(my_swarms[k],2,neighborsArray[int(np.floor(i/50))])
+        else:
+          my_swarms[k].best_pos, my_swarms[k].best_cost = my_topology.compute_gbest(my_swarms[k])
+    #print('Iteration: {} | my_swarm.best_cost: {:.4f}'.format(i+1, my_swarm.best_cost))
+
+    for k in range(annealingLayers):
+    #Update velocities and positions for the next iteration
+      if i < iterSwitch:
+        my_swarms[k].velocity = my_topology.compute_velocity(my_swarms[k],clamp=None,vh=velocityHandler,bounds=(loBounds,hiBounds))
+        my_swarms[k].position = my_topology.compute_position(my_swarms[k],bounds=paramBounds,bh=boundaryHandler)
+      else:
+        my_swarms[k].velocity = my_topology.compute_velocity(my_swarms[k])
+        my_swarms[k].position = my_topology.compute_position(my_swarms[k],bounds=paramBounds,bh=boundaryHandler)
+      #Save checkpoint information in case this run gets interupted.
+      f = open('checkpoint_%i/psoBestCostTracker_%i.csv' % (batchNumber,k),'a')
+      f.write(str(i) + "," + str(my_swarms[k].best_cost) + "\n")
+      f.close()
+      if i != nIterations-1:
+        np.savetxt('checkpoint_%i/psoSavePositions_%i.csv' % (batchNumber,k),my_swarms[k].position,delimiter=',')
+        np.savetxt('checkpoint_%i/psoSaveVelocities_%i.csv' % (batchNumber,k),my_swarms[k].velocity,delimiter=',')
+        np.savetxt('checkpoint_%i/psoSavePBestPos_%i.csv' % (batchNumber,k),my_swarms[k].pbest_pos,delimiter=',')
+        np.savetxt('checkpoint_%i/psoSavePBestCost_%i.csv' % (batchNumber,k),my_swarms[k].pbest_cost,delimiter=',')
+        np.savetxt('checkpoint_%i/psoSaveBestPos_%i.csv' % (batchNumber,k),my_swarms[k].best_pos,delimiter=',')
+        f = open('checkpoint_%i/psoSaveIterAndCost_%i.csv' % (batchNumber,k),'w')
+        f.write(str(i) + "\n")
+        f.write(str(my_swarms[k].best_cost) + "\n")
+        f.close()
+
+  #After the optimization is complete, find the best result and save it to file.
+  bestSwarm = 0
+  bestCost = my_swarms[0].best_cost
+  if annealingLayers > 1:
+    for k in range(1,annealingLayers):
+      if my_swarms[k].best_cost < bestCost:
+        bestCost = my_swarms[k].best_cost
+        bestSwarm = k
+  f = open('particleSwarmResult_%i.csv' % batchNumber,'w')
+  f.write('The best cost found by our swarm is: {:.4f}\n'.format(bestCost))
+  f.write('The best position found by our swarm is: {}\n'.format(my_swarms[bestSwarm].best_pos))
   f.close()
-  my_swarm.position = np.loadtxt('checkpoint_%i/psoSavePositions.csv' % batchNumber,delimiter=',')
-  my_swarm.velocity = np.loadtxt('checkpoint_%i/psoSaveVelocities.csv' % batchNumber,delimiter=',')
-  my_swarm.pbest_pos = np.loadtxt('checkpoint_%i/psoSavePBestPos.csv' % batchNumber,delimiter=',')
-  my_swarm.pbest_cost = np.loadtxt('checkpoint_%i/psoSavePBestCost.csv' % batchNumber,delimiter=',')
-  my_swarm.best_pos = np.loadtxt('checkpoint_%i/psoSaveBestPos.csv' % batchNumber,delimiter=',')  
-else:
-  os.mkdir("checkpoint_%i" % batchNumber)
-  iterStart = 0
-for i in range(iterStart,nIterations):
-  if i == iterSwitch:
-    my_topology = Star()
-  
-  #Get the chisq for each particle position
-  my_swarm.current_cost = getSwarmChisq(my_swarm.position,i,nThreads)
-  #initial best cost and best position for each particle 
-  if i == 0:
-    my_swarm.pbest_cost = my_swarm.current_cost
-    my_swarm.pbest_pos = my_swarm.position
-  #If it's not the first iteration, check if this position is better than particle's best
-  #and update if it is.
-  else:
-    for j in range(len(my_swarm.current_cost)):
-      if my_swarm.current_cost[j] <= my_swarm.pbest_cost[j]:
-        my_swarm.pbest_pos[j] = my_swarm.position[j]
-        my_swarm.pbest_cost[j] = my_swarm.current_cost[j]
-  
-  #Track the global best cost
-  if np.min(my_swarm.pbest_cost) < my_swarm.best_cost:
-    if i < iterSwitch:
-      my_swarm.best_pos, my_swarm.best_cost = my_topology.compute_gbest(my_swarm,2,neighborsArray[int(np.floor(i/50))])
-      best_iter = i
-    else:
-      my_swarm.best_pos, my_swarm.best_cost = my_topology.compute_gbest(my_swarm)
-      best_iter = i
 
-  print('Iteration: {} | my_swarm.best_cost: {:.4f}'.format(i+1, my_swarm.best_cost))
+  #Clean up the subdirectories made for running GOSIA and terminate the program.
+  for j in range(batchNumber*(nThreads-1),batchNumber*(nThreads-1)+nThreads-1):
+    gm.removeSubDirectories(j)
+  print("Finalizing Rank 0")
+  MPI.Finalize()
 
-  
-  #Update velocities and positions for the next iteration
-  if i < iterSwitch:
-    my_swarm.velocity = my_topology.compute_velocity(my_swarm,clamp=None,vh=velocityHandler,bounds=(loBounds,hiBounds))
-    my_swarm.position = my_topology.compute_position(my_swarm,bounds=paramBounds,bh=boundaryHandler)
-  else:
-    my_swarm.velocity = my_topology.compute_velocity(my_swarm)
-    my_swarm.position = my_topology.compute_position(my_swarm,bounds=paramBounds,bh=boundaryHandler)
-  if i != nIterations-1:
-    np.savetxt('checkpoint_%i/psoSavePositions.csv' % batchNumber,my_swarm.position,delimiter=',')
-    np.savetxt('checkpoint_%i/psoSaveVelocities.csv' % batchNumber,my_swarm.velocity,delimiter=',')
-    np.savetxt('checkpoint_%i/psoSavePBestPos.csv' % batchNumber,my_swarm.pbest_pos,delimiter=',')
-    np.savetxt('checkpoint_%i/psoSavePBestCost.csv' % batchNumber,my_swarm.pbest_cost,delimiter=',')
-    np.savetxt('checkpoint_%i/psoSaveBestPos.csv' % batchNumber,my_swarm.best_pos,delimiter=',')
-    f = open('checkpoint_%i/psoSaveIterAndCost.csv' % batchNumber,'w')
-    f.write(str(i) + "\n")
-    f.write(str(my_swarm.best_cost) + "\n")
-    f.close()
+#This block of code is for the non-zero ranks. Once they have been initialized (above) they remain in this loop until the terminate signal is received.
+elif rank > 0:
+  terminate = False
+  while terminate == False:
+    #We expect to receive the positions, the terminate flag, the particle numbers assigned to this rank, and the subdirectory name as messages passed from rank 0.
+    positions = comm.recv(source=0)
+    terminate = comm.recv(source=0)
+    threadFirstLast = comm.recv(source=0)
+    chainDir = comm.recv(source=0)
+    #Evaluate th candidate solutions and send the chisq values back to rank 0.
+    chisqArray = getParticleChisq(positions,threadFirstLast,chainDir)
+    comm.send(chisqArray,dest=0)
+  print("Finalizing Rank %i" % rank)
+  MPI.Finalize()
 
-f = open('adaptiveParticleSwarmResult_%i.csv' % batchNumber,'w')
-f.write('The best cost found by our swarm is: {:.4f}\n'.format(my_swarm.best_cost))
-f.write('The best position found by our swarm is: {}\n'.format(my_swarm.best_pos))
-f.write('The number of iterations needed was: {}\n'.format(i))
-f.close()
-
-for j in range(batchNumber*nThreads,batchNumber*nThreads+nThreads):
-  gm.removeSubDirectories(j)
