@@ -1,0 +1,364 @@
+1
+ *****************************************************************************************************************************
+ *****************************************************************************************************************************
+ **************************************************                         **************************************************
+ **************************************************          GOSIA2         **************************************************
+ **************************************************                         **************************************************
+ *****************************************************************************************************************************
+ *****************************************************************************************************************************
+
+
+
+
+
+                    ROCHESTER COULOMB EXCITATION DATA ANALYSIS CODE BY T.CZOSNYKA,D.CLINE AND C.Y.WU
+                                                  VERSION: 20081208.25
+
+
+
+
+
+
+               Coulomb excitation of 116Sn                                                
+          ----------------------------------------------------------------------------------------------------
+
+                                        LEVELS
+
+     INDEX     PARITY         SPIN           ENERGY(MEV)
+       1           +           0.0            0.0000
+       2           +           2.0            1.2936
+       3           +           2.0            2.2254
+       4           +           4.0            2.3909
+       5           +           4.0            3.0969
+
+                                        MATRIX ELEMENTS
+
+
+     MULTIPOLARITY=2
+    INDEX   NF     NS          ME               LIMITS
+       1      1      2        0.10000       -1.00000        1.00000
+       2      1      3        0.10000       -1.00000        1.00000
+       3      2      2        0.10000       -1.00000        1.00000
+       4      2      3        0.10000       -2.00000        2.00000
+       5      2      4        0.10000       -2.00000        2.00000
+       6      4      4        0.10000       -2.00000        2.00000
+       7      4      5        0.10000       -2.00000        2.00000
+     MULTIPOLARITY=7
+    INDEX   NF     NS          ME               LIMITS
+       8      2      3        0.10000       -1.00000        1.00000
+       9      4      5        0.10000       -1.00000        1.00000
+
+
+       14 EXPERIMENTAL YIELDS            9 MATRIX ELEMENTS TO BE VARIED
+
+
+
+
+
+
+     *****  RESTART-MATRIX ELEMENTS OVERWRITTEN  *****
+
+
+
+
+                                        MATRIX ELEMENTS
+
+
+     MULTIPOLARITY=2
+    INDEX   NF     NS          ME               LIMITS
+       1      1      2        0.43989       -1.00000        1.00000
+       2      1      3        0.17622       -1.00000        1.00000
+       3      2      2        0.25292       -1.00000        1.00000
+       4      2      3        0.49357       -2.00000        2.00000
+       5      2      4        0.71358       -2.00000        2.00000
+       6      4      4        1.09675       -2.00000        2.00000
+       7      4      5        0.67003       -2.00000        2.00000
+     MULTIPOLARITY=7
+    INDEX   NF     NS          ME               LIMITS
+       8      2      3       -0.97311       -1.00000        1.00000
+       9      4      5        0.79714       -1.00000        1.00000
+
+
+
+
+
+     INTEGRATED RUTHERFORD CROSS SECTION=.3527E+05  FOR EXP. 1
+
+
+
+
+
+                                                  INTEGRATED YIELDS
+
+     EXPERIMENT  1  DETECTOR  1
+     ENERGY RANGE  400.200--- 442.000 MEV   SCATTERING ANGLE RANGE  20.270--- 30.800 DEG
+
+     NI     NF     II     IF     YIELD     NORMALIZED YIELD
+
+      5      4    4.0    4.0   0.15724E-03   0.54954E-06
+      4      2    4.0    2.0   0.59852E+00   0.20917E-02
+      3      1    2.0    0.0   0.55625E+00   0.19440E-02
+      3      2    2.0    2.0   0.44722E+00   0.15630E-02
+      2      1    2.0    0.0   0.28614E+03   0.10000E+01
+
+
+
+
+
+     INTEGRATED RUTHERFORD CROSS SECTION=.1155E+05  FOR EXP. 2
+
+
+
+
+
+                                                  INTEGRATED YIELDS
+
+     EXPERIMENT  2  DETECTOR  1
+     ENERGY RANGE  400.200--- 442.000 MEV   SCATTERING ANGLE RANGE  29.960--- 38.750 DEG
+
+     NI     NF     II     IF     YIELD     NORMALIZED YIELD
+
+      5      4    4.0    4.0   0.15506E-02   0.38874E-05
+      4      2    4.0    2.0   0.24532E+01   0.61500E-02
+      3      1    2.0    0.0   0.14071E+01   0.35275E-02
+      3      2    2.0    2.0   0.11279E+01   0.28275E-02
+      2      1    2.0    0.0   0.39889E+03   0.10000E+01
+
+
+
+
+
+     INTEGRATED RUTHERFORD CROSS SECTION=.5189E+04  FOR EXP. 3
+
+
+
+
+
+                                                  INTEGRATED YIELDS
+
+     EXPERIMENT  3  DETECTOR  1
+     ENERGY RANGE  400.200--- 442.000 MEV   SCATTERING ANGLE RANGE  38.080--- 45.260 DEG
+
+     NI     NF     II     IF     YIELD     NORMALIZED YIELD
+
+      5      4    4.0    4.0   0.49753E-02   0.13306E-04
+      4      2    4.0    2.0   0.42676E+01   0.11413E-01
+      3      1    2.0    0.0   0.16886E+01   0.45161E-02
+      3      2    2.0    2.0   0.13624E+01   0.36434E-02
+      2      1    2.0    0.0   0.37392E+03   0.10000E+01
+
+
+
+
+
+     INTEGRATED RUTHERFORD CROSS SECTION=.2788E+04  FOR EXP. 4
+
+
+
+
+
+                                                  INTEGRATED YIELDS
+
+     EXPERIMENT  4  DETECTOR  1
+     ENERGY RANGE  400.200--- 442.000 MEV   SCATTERING ANGLE RANGE  44.730--- 50.560 DEG
+
+     NI     NF     II     IF     YIELD     NORMALIZED YIELD
+
+      5      4    4.0    4.0   0.87356E-02   0.28648E-04
+      4      2    4.0    2.0   0.50547E+01   0.16577E-01
+      3      1    2.0    0.0   0.15998E+01   0.52464E-02
+      3      2    2.0    2.0   0.12991E+01   0.42602E-02
+      2      1    2.0    0.0   0.30493E+03   0.10000E+01
+
+
+
+
+
+     INTEGRATED RUTHERFORD CROSS SECTION=.1107E+04  FOR EXP. 5
+
+
+
+
+
+                                                  INTEGRATED YIELDS
+
+     EXPERIMENT  5  DETECTOR  1
+     ENERGY RANGE  400.200--- 442.000 MEV   SCATTERING ANGLE RANGE  20.270--- 30.800 DEG
+
+     NI     NF     II     IF     YIELD     NORMALIZED YIELD
+
+      5      4    4.0    4.0   0.91356E-01   0.25988E-03
+      4      2    4.0    2.0   0.14524E+02   0.41315E-01
+      3      1    2.0    0.0   0.23835E+01   0.67802E-02
+      3      2    2.0    2.0   0.20017E+01   0.56942E-02
+      2      1    2.0    0.0   0.35153E+03   0.10000E+01
+
+
+
+
+
+     INTEGRATED RUTHERFORD CROSS SECTION=.1583E+04  FOR EXP. 6
+
+
+
+
+
+                                                  INTEGRATED YIELDS
+
+     EXPERIMENT  6  DETECTOR  1
+     ENERGY RANGE  400.200--- 442.000 MEV   SCATTERING ANGLE RANGE  29.960--- 38.750 DEG
+
+     NI     NF     II     IF     YIELD     NORMALIZED YIELD
+
+      5      4    4.0    4.0   0.77273E-01   0.18357E-03
+      4      2    4.0    2.0   0.15834E+02   0.37615E-01
+      3      1    2.0    0.0   0.28364E+01   0.67381E-02
+      3      2    2.0    2.0   0.23917E+01   0.56817E-02
+      2      1    2.0    0.0   0.42095E+03   0.10000E+01
+
+
+
+
+
+     INTEGRATED RUTHERFORD CROSS SECTION=.2062E+04  FOR EXP. 7
+
+
+
+
+
+                                                  INTEGRATED YIELDS
+
+     EXPERIMENT  7  DETECTOR  1
+     ENERGY RANGE  400.200--- 442.000 MEV   SCATTERING ANGLE RANGE  38.080--- 45.260 DEG
+
+     NI     NF     II     IF     YIELD     NORMALIZED YIELD
+
+      5      4    4.0    4.0   0.48077E-01   0.11083E-03
+      4      2    4.0    2.0   0.13347E+02   0.30766E-01
+      3      1    2.0    0.0   0.27955E+01   0.64441E-02
+      3      2    2.0    2.0   0.23278E+01   0.53660E-02
+      2      1    2.0    0.0   0.43381E+03   0.10000E+01
+
+
+
+
+
+     INTEGRATED RUTHERFORD CROSS SECTION=.2546E+04  FOR EXP. 8
+
+
+
+
+
+                                                  INTEGRATED YIELDS
+
+     EXPERIMENT  8  DETECTOR  1
+     ENERGY RANGE  400.200--- 442.000 MEV   SCATTERING ANGLE RANGE  44.730--- 50.560 DEG
+
+     NI     NF     II     IF     YIELD     NORMALIZED YIELD
+
+      5      4    4.0    4.0   0.24358E-01   0.60534E-04
+      4      2    4.0    2.0   0.94522E+01   0.23491E-01
+      3      1    2.0    0.0   0.23910E+01   0.59423E-02
+      3      2    2.0    2.0   0.19627E+01   0.48778E-02
+      2      1    2.0    0.0   0.40238E+03   0.10000E+01
+
+
+
+
+
+     INTEGRATED RUTHERFORD CROSS SECTION=.1833E+03  FOR EXP. 9
+
+
+
+
+
+                                                  INTEGRATED YIELDS
+
+     EXPERIMENT  9  DETECTOR  1
+     ENERGY RANGE  400.200--- 442.000 MEV   SCATTERING ANGLE RANGE 131.320---160.940 DEG
+
+     NI     NF     II     IF     YIELD     NORMALIZED YIELD
+
+      5      4    4.0    4.0   0.21592E-01   0.31194E-03
+      4      2    4.0    2.0   0.26320E+01   0.38025E-01
+      3      1    2.0    0.0   0.45268E+00   0.65400E-02
+      3      2    2.0    2.0   0.35661E+00   0.51521E-02
+      2      1    2.0    0.0   0.69217E+02   0.10000E+01
+
+
+
+          EXPERIMENT  1        DETECTOR  1
+
+         NI     NF     YEXP        YCOR        COR.F
+
+        2        1   .113E+05    .427E+05    .379E+01
+
+
+
+          EXPERIMENT  2        DETECTOR  1
+
+         NI     NF     YEXP        YCOR        COR.F
+
+        2        1   .150E+05    .684E+05    .457E+01
+
+
+
+          EXPERIMENT  3        DETECTOR  1
+
+         NI     NF     YEXP        YCOR        COR.F
+
+        2        1   .143E+05    .798E+05    .556E+01
+
+
+
+          EXPERIMENT  4        DETECTOR  1
+
+         NI     NF     YEXP        YCOR        COR.F
+
+        2        1   .123E+05    .840E+05    .682E+01
+
+
+
+          EXPERIMENT  5        DETECTOR  1
+
+         NI     NF     YEXP        YCOR        COR.F
+
+        4        2   .332E+03    .119E+04    .359E+01
+        2        1   .121E+05    .452E+05    .372E+01
+
+
+
+          EXPERIMENT  6        DETECTOR  1
+
+         NI     NF     YEXP        YCOR        COR.F
+
+        4        2   .655E+03    .287E+04    .439E+01
+        2        1   .158E+05    .712E+05    .451E+01
+
+
+
+          EXPERIMENT  7        DETECTOR  1
+
+         NI     NF     YEXP        YCOR        COR.F
+
+        4        2   .506E+03    .272E+04    .538E+01
+        2        1   .161E+05    .891E+05    .554E+01
+
+
+
+          EXPERIMENT  8        DETECTOR  1
+
+         NI     NF     YEXP        YCOR        COR.F
+
+        4        2   .368E+03    .243E+04    .660E+01
+        2        1   .153E+05    .104E+06    .681E+01
+
+
+
+          EXPERIMENT  9        DETECTOR  1
+
+         NI     NF     YEXP        YCOR        COR.F
+
+        4        2   .920E+02    .105E+03    .114E+01
+        2        1   .242E+04    .291E+04    .120E+01
+               ********* END OF EXECUTION **********
