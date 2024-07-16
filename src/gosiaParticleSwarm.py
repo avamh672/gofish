@@ -56,11 +56,11 @@ to get it to read your input file properly.
 import numpy as np
 import pyswarms.backend as P
 import gosiaManager
-from Modified_Ring import Modified_Ring
 from pyswarms.backend.topology import Ring
 from pyswarms.backend.topology import Star
 from pyswarms.backend.handlers import VelocityHandler
 from pyswarms.backend.handlers import BoundaryHandler
+from bisect import bisect
 from mpi4py import MPI
 import os
 import sys
@@ -259,12 +259,39 @@ else:
   annealingLayers = 1
   annealingRates = [inertialCoeff]
   crossoverIterations = []
+if "topology" in gm.configDict.keys():
+  graphTopology = gm.configDict["topology"]
+else:
+  graphTopology = "star"
+#If we are using the dynamic topology, we need to determine when and how the topology will change. This can be user specified or use default values.
+if graphTopology == "dynamic":
+  #nNeighbors will be an integer or a list of integers
+  if "nNeighbors" in gm.configDict.keys():
+    neighborsArray = gm.configDict["nNeighbors"].split(",")
+    neighborsArray = [int(x) for x in neighborsArray]
+  else:
+    neighborsArray = [20,30,40,60,80,120,160]
+  #topologySwitchIterations will be an integer or a list of integers. If there is only one element in the neighborsArray and this parameter is not specified by the user, we will use the ring topology.
+  if "topologySwitchIterations" in gm.configDict.keys():
+    topologySwitchIterations = gm.configDict["topologySwitchIterations"].split(",")
+    topologySwitchIterations = [int(x) for x in topologySwitchIterations]
+  elif len(neighborsArray) == 1:
+    topologySwitchIterations = [10*nIterations]
+  else:
+    topologySwitchIterations = [50,100,150,200,250,300,350]
+  #Check if the lengths of neighborsArray and topologySwitchIterations are compatible. They should be either the same length, in which case the final topology will be the star topology, or topologySwitchIterations
+  #should have one fewer element, in which case the last specified topology will be the final topology.
+  if len(topologySwitchIterations) == len(neighborsArray):
+    neighborsArray.append("star")
+  elif len(topologySwitchIterations) != (len(neighborsArray)-1):
+    raise Exception("ERROR: %i topologies are specified by the parameter nNeighbors, and %i topology switch points are specified by the parameter topologySwitchIterations. The number of topologies must be either equal to the number of switch points or one greater than the number of switch points. If they are equal, the final switch point will switch to the star topology." % (len(neighborsArray),len(topologySwitchIterations)))
+
+
 
 #Check if the number of annealing rates and crossover points (if applicable) matches the number of annealing layers. Only rank 0 performs this check to avoid repeat error messages.
 if rank == 0:
   if len(annealingRates) != annealingLayers:
-    print("ERROR: Number of annealing layers is set to %i but %i annealing rates are specified." % annealingLayers,len(annealingRates))
-    sys.exit()
+    raise Exception("ERROR: Number of annealing layers is set to %i but %i annealing rates are specified." % annealingLayers,len(annealingRates))
   if annealingLayers > 1:
     if len(crossoverIterations) < annealingLayers - 1:
       print("WARNING: Number of crossovers is not sufficient to pass all particles through all annealing layers.")
@@ -304,13 +331,19 @@ observables,uncertainties,beamExptMap,targetExptMap,beamDoubletMap,targetDoublet
 exptUpperLimits = gm.getUpperLimits(beamExptMap,targetExptMap,observables)
 
 if rank == 0:
-  #During the development of this program, I found the best approach was to start with a
-  #local topology (Ring) and increase the number of neighbors every 50 iterations until
-  #eventually progressing to the Star topology (fully connected). This allows the particles 
-  #to first explore the space near where they start and prevents premature convergence to a 
-  #local minimum. The "Modified_Ring" topology is identical to the ring topology except that 
-  #the output of the of the compute_gbest function is modified to better work with this program.
-  my_topology = Modified_Ring(static=False)
+  #This program can handle two topology options, Dynamic or Star. The Star topology is the fully connected 'gbest' toplogy, and the 
+  #dynamic toplogy begins as a ring topology with n=20 and slowly adds connections until the graph is fully connected. The Star 
+  #topology was observed to converge faster. In theory, the advantage of lbest topologies such as the ring topology is that they are 
+  #less likely to prematurely converge to a local minimum. In the analysis of the Sn CoulEx on which this data was benchmarked, >90%
+  #of runs with the star topology converged to the apparent global minimum, so I used the star topology. However, the dynamic topology
+  #remains included for use by future users. 
+  
+  if graphTopology == "dynamic":
+    my_topology = Ring(static=False)
+  elif graphTopology == "star":
+    my_topology = Star()
+  else:
+    raise Exception("ERROR: Topology %s is not available. The options for toplogy are star or dynamic." % graphTopology)
 
   #c1 is the cognitive parameter (velocity component towards particle's own best position)
   #c2 is the social parameter (velocity component towards best position of particle it can communicate with)
@@ -323,9 +356,7 @@ if rank == 0:
     my_options = {'c1' : cognitiveCoeff, 'c2' : socialCoeff, 'w' : annealingRates[i]}
     my_swarms.append(P.create_swarm(n_particles=nParticles,dimensions=nDimensions,bounds=paramBounds,options=my_options))
     
-  #Set the parameters for the adaptive topology
-  iterSwitch = 350
-  neighborsArray = [20,30,40,60,80,120,160]
+  
 
   #We use a checkpointing system that saves the state of the graph at each iteration so that
   #jobs can be run on a scavenger queue or otherwise interupted and resumed. 
@@ -333,11 +364,16 @@ if rank == 0:
     #We save a separate set of checkpoint files for each annealing layer, so we loop over them here.
     for j in range(annealingLayers):
       f = open("checkpoint_%i/psoSaveIterAndCost_%i.csv" % (batchNumber,j))
-      #Get the current iteration number. If it is passed the switchover point to star topology, assign that topology here.
+      #Get the current iteration number and set the toplogy accordingly.
       if j == 0:
         iterStart = int(f.readline().strip()) + 1
-        if iterStart > iterSwitch:
-          my_topology = Star()
+        if graphTopology == "dynamic":
+          currentTopologyIteration = bisect(topologySwitchIterations,i)
+          if neighborsArray[currentTopologyIteration] == "star":
+            graphTopology = "star"
+            my_topology = Star()
+          else:
+            nNeighbors = neighborsArray[currentTopologyIteration]
       my_swarms[j].best_cost = float(f.readline().strip())
       f.close()
       #Load the parameters for this swarm
@@ -354,9 +390,15 @@ if rank == 0:
   
   #Now we start the main part of of code: the for loop over the optimizer iterations.
   for i in range(iterStart,nIterations):
-    #If we are at the switchover point to star topology, switch topologies. 
-    if i == iterSwitch:
-      my_topology = Star()
+    #If we are using the dynamic topology, check what the current topology should be
+    if graphTopology == "dynamic":
+      currentTopologyIteration = bisect(topologySwitchIterations,i)
+      if neighborsArray[currentTopologyIteration] == "star":
+        graphTopology = "star"
+        my_topology = Star()
+      else:
+        nNeighbors = neighborsArray[currentTopologyIteration]
+
 
     #If we have multiple annealing layers, check if we are at a crossover iteration. If we are, cycle the annealing layers.
     if annealingLayers > 1:
@@ -389,16 +431,17 @@ if rank == 0:
             my_swarms[k].pbest_pos[j] = my_swarms[k].position[j]
             my_swarms[k].pbest_cost[j] = my_swarms[k].current_cost[j]
     #Track the global best cost
+    if graphTopology == "dynamic":
+      if np.min(my_swarms[k].pbest_cost) < np.min(my_swarms[k].best_cost):
+          my_swarms[k].best_pos, my_swarms[k].best_cost = my_topology.compute_gbest(my_swarms[k],2,nNeighbors)
+    else:
       if np.min(my_swarms[k].pbest_cost) < my_swarms[k].best_cost:
-        if i < iterSwitch:
-          my_swarms[k].best_pos, my_swarms[k].best_cost = my_topology.compute_gbest(my_swarms[k],2,neighborsArray[int(np.floor(i/50))])
-        else:
           my_swarms[k].best_pos, my_swarms[k].best_cost = my_topology.compute_gbest(my_swarms[k])
     #print('Iteration: {} | my_swarm.best_cost: {:.4f}'.format(i+1, my_swarm.best_cost))
 
     for k in range(annealingLayers):
     #Update velocities and positions for the next iteration
-      if i < iterSwitch:
+      if graphTopology == "dynamic":
         my_swarms[k].velocity = my_topology.compute_velocity(my_swarms[k],clamp=None,vh=velocityHandler,bounds=(loBounds,hiBounds))
         my_swarms[k].position = my_topology.compute_position(my_swarms[k],bounds=paramBounds,bh=boundaryHandler)
       else:
@@ -429,7 +472,12 @@ if rank == 0:
         bestSwarm = k
   f = open('particleSwarmResult_%i.csv' % batchNumber,'w')
   f.write('The best cost found by our swarm is: {:.4f}\n'.format(bestCost))
-  f.write('The best position found by our swarm is: {}\n'.format(my_swarms[bestSwarm].best_pos))
+  if graphTopology == "dynamic":
+    bestPosIndex = np.where(my_swarms[k].pbest_cost == bestCost)
+    globalBestPos = my_swarms[k].pbest_pos[bestPosIndex]
+    f.write('The best position found by our swarm is: {}\n'.format(globalBestPos))
+  else:
+    f.write('The best position found by our swarm is: {}\n'.format(my_swarms[bestSwarm].best_pos))
   f.close()
 
   #Clean up the subdirectories made for running GOSIA and terminate the program.
