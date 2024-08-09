@@ -27,6 +27,15 @@ class gosiaManager:
             self.configDict[splitline[0].strip()] = False
           else:
             raise Exception("ERROR: %s must be True or False!" % splitline[0].strip())
+        elif (splitline[0].strip() == "beamMultipletStates") or (splitline[0].strip() == "targetMultipletStates"):
+          multipletArray = splitline[1].strip().split(",")
+          if len(multipletArray) % 2 == 1:
+            raise Exception("ERROR: Number of initial/final states for the parameter multipletStates must be even. There are %i states given." % len(multipletArray))
+          else:
+            self.configDict[splitline[0].strip()] = []
+            nPairs = int(len(multipletArray)/2)
+            for j in range(nPairs):
+              self.configDict[splitline[0].strip()].append((int(multipletArray[2*j]),int(multipletArray[2*j+1])))
         else:
           self.configDict[splitline[0].strip()] = splitline[1].strip()
         line = f.readline()
@@ -45,6 +54,12 @@ class gosiaManager:
     for key in expectedFromConfig:
       if key not in self.configDict.keys():
         raise Exception("ERROR: Variable %s not in config file!" % key)
+
+    #If the user did not declare any multiplet states in the config file, we set this parameter to an empty array.
+    if "beamMultipletStates" not in self.configDict.keys():
+      self.configDict["beamMultipletStates"] = []
+    if "targetMultipletStates" not in self.configDict.keys():
+      self.configDict["targetMultipletStates"] = []
 
     f = open(self.configDict["beamINTIinp"],'r')
     line = f.readline()
@@ -361,6 +376,87 @@ class gosiaManager:
     targetExptMap = []
     beamDoubletMap = {}
     targetDoubletMap = {}
+    beamMultipletMap = {}
+    targetMultipletMap = {}
+
+    #Make a map of the beam multiplet states so they can be processed properly.
+    for multiplet in self.configDict["beamMultipletStates"]:
+      init = multiplet[0]
+      final = multiplet[1]
+      if init < 10000:
+        raise Exception("ERROR: Initial state for multiplet is not formatted properly. For instructions on how to format multiplet states, see the GOFISH user manual.")
+      elif init < 1000000:
+        if final >= 10000 and final < 1000000:
+          firstTransitionInit = int((init - (init % 10000))/10000)
+          firstTransitionFinal = int((final - (final % 10000))/10000)
+          secondTransitionInit = int(((init % 10000) - (init % 100))/100)
+          secondTransitionFinal = int(((final % 10000) - (final % 100))/100)
+          thirdTransitionInit = init % 100
+          thirdTransitionFinal = final % 100
+          beamMultipletMap[(firstTransitionInit,firstTransitionFinal)] = (init,final)
+          beamMultipletMap[(secondTransitionInit,secondTransitionFinal)] = (init,final)
+          beamMultipletMap[(thirdTransitionInit,thirdTransitionFinal)] = (init,final)
+        else:
+          raise Exception("ERROR: Initial and final state for multiplets do not indicate the same number of transitions.")
+      elif init < 100000000:
+        if final >= 1000000 and final < 100000000:
+          firstTransitionInit = int((init - (init % 1000000))/1000000)
+          firstTransitionFinal = int((final - (final % 1000000))/1000000)
+          secondTransitionInit = int(((init % 1000000) - (init % 10000))/10000)
+          secondTransitionFinal = int(((final % 1000000) - (final % 10000))/10000)
+          thirdTransitionInit = int(((init % 10000) - (init % 100))/100)
+          thirdTransitionFinal = int(((final % 10000) - (final % 100))/100)
+          fourthTransitionInit = init % 100
+          fourthTransitionFinal = final % 100
+          beamMultipletMap[(firstTransitionInit,firstTransitionFinal)] = (init,final)
+          beamMultipletMap[(secondTransitionInit,secondTransitionFinal)] = (init,final)
+          beamMultipletMap[(thirdTransitionInit,thirdTransitionFinal)] = (init,final)
+          beamMultipletMap[(fourthTransitionInit,fourthTransitionFinal)] = (init,final)
+        else:
+          raise Exception("ERROR: Initial and final state for multiplets do not indicate the same number of transitions.")
+      elif init < 10000000000:
+        if final >= 100000000 and final < 10000000000:
+          firstTransitionInit = int((init - (init % 100000000))/100000000)
+          firstTransitionFinal = int((final - (final % 100000000))/100000000)
+          secondTransitionInit = int(((init % 100000000) - (init % 1000000))/1000000)
+          secondTransitionFinal = int(((final % 100000000) - (final % 1000000))/1000000)
+          thirdTransitionInit = int(((init % 1000000) - (init % 10000))/10000)
+          thirdTransitionFinal = int(((final % 1000000) - (final % 10000))/10000)
+          fourthTransitionInit = int(((init % 10000) - (init % 100))/100)
+          fourthTransitionFinal = int(((final % 10000) - (final % 100))/100)
+          fifthTransitionInit = init % 100
+          fifthTransitionFinal = final % 100
+          beamMultipletMap[(firstTransitionInit,firstTransitionFinal)] = (init,final)
+          beamMultipletMap[(secondTransitionInit,secondTransitionFinal)] = (init,final)
+          beamMultipletMap[(thirdTransitionInit,thirdTransitionFinal)] = (init,final)
+          beamMultipletMap[(fourthTransitionInit,fourthTransitionFinal)] = (init,final)
+          beamMultipletMap[(fifthTransitionInit,fifthTransitionFinal)] = (init,final)
+        else:
+          raise Exception("ERROR: Initial and final states for multiplets do not indicate the same number of transitions.")
+      elif init < 1000000000000:
+        if final >= 10000000000 and final < 1000000000000:
+          firstTransitionInit = int((init - (init % 10000000000))/10000000000)
+          firstTransitionFinal = int((final - (final % 10000000000))/10000000000)
+          secondTransitionInit = int(((init % 10000000000) - (init % 100000000))/100000000)
+          secondTransitionFinal = int(((final % 10000000000) - (final % 100000000))/100000000)
+          thirdTransitionInit = int(((init % 100000000) - (init % 1000000))/1000000)
+          thirdTransitionFinal = int(((final % 100000000) - (final % 1000000))/1000000)
+          fourthTransitionInit = int(((init % 1000000) - (init % 10000))/10000)
+          fourthTransitionFinal = int(((final % 1000000) - (final % 10000))/10000)
+          fifthTransitionInit = int(((init % 10000) - (init % 100))/100)
+          fifthTransitionFinal = int(((final % 10000) - (final % 100))/100)
+          sixthTransitionInit = init % 100
+          sixthTransitionFinal = final % 100
+          beamMultipletMap[(firstTransitionInit,firstTransitionFinal)] = (init,final)
+          beamMultipletMap[(secondTransitionInit,secondTransitionFinal)] = (init,final)
+          beamMultipletMap[(thirdTransitionInit,thirdTransitionFinal)] = (init,final)
+          beamMultipletMap[(fourthTransitionInit,fourthTransitionFinal)] = (init,final)
+          beamMultipletMap[(fifthTransitionInit,fifthTransitionFinal)] = (init,final)
+          beamMultipletMap[(sixthTransitionInit,sixthTransitionFinal)] = (init,final)
+        else:
+          raise Exception("ERROR: Initial and final states for multiplets do not indicate the same number of transitions.")
+      else:
+        raise Exception("ERROR: GOFISH accepts multiplets containing up to 6 transitions at most. One of the provided multiplets indicates 7 or more states.")
 
     expt = 0
     #parse the corrected yields file and store them, along with the exptMap
@@ -373,22 +469,23 @@ class gosiaManager:
       elif len(splitline) == 4:
         init = int(splitline[0])
         final = int(splitline[1])
-        beamExptMap.append((expt,init,final))
-        """
-        if init >= 10000:
-          secondTransitionInit = ((init % 10000) - (init % 100))/100
-          secondTransitionFinal = ((final % 10000) - (final % 100))/100
-          thirdTransitionInit = init % 100
-          thirdTransitionFinal = final % 100
-          beamTripletMap[(secondTransitionInit,secondTransitionFinal)] = (init,final)
-          beamTripletMap[(thirdTransitionInit,thirdTransitionFinal)] = (init,final)
-        """
-        if init >= 100:
-          secondTransitionInit = init % 100
-          secondTransitionFinal = final % 100
-          beamDoubletMap[(secondTransitionInit,secondTransitionFinal)] = (init,final)
-        observables.append(float(splitline[2]))
-        uncertainties.append(float(splitline[3]))
+        if (init,final) in beamMultipletMap.keys():
+          if (expt,beamMultipletMap[(init,final)][0],beamMultipletMap[(init,final)][1]) not in beamExptMap:
+            beamExptMap.append((expt,beamMultipletMap[(init,final)][0],beamMultipletMap[(init,final)][1]))
+            observables.append(float(splitline[2]))
+            uncertainties.append(float(splitline[3]))
+          else:
+            observableIndex = beamExptMap.index((expt,beamMultipletMap[(init,final)][0],beamMultipletMap[(init,final)][1]))
+            observables[observableIndex] += float(splitline[2])
+            uncertainties[observableIndex] += float(splitline[3])
+        else:
+          beamExptMap.append((expt,init,final))
+          if init >= 100:
+            secondTransitionInit = init % 100
+            secondTransitionFinal = final % 100
+            beamDoubletMap[(secondTransitionInit,secondTransitionFinal)] = (init,final)
+          observables.append(float(splitline[2]))
+          uncertainties.append(float(splitline[3]))
       line = f.readline()
     f.close()
 
@@ -455,6 +552,85 @@ class gosiaManager:
     
     #Do the same thing but for the target if simulMin is true
     if self.configDict["simulMin"] == True:
+
+      for multiplet in self.configDict["targetMultipletStates"]:
+        init = multiplet[0]
+        final = multiplet[1]
+        if init < 10000:
+          raise Exception("ERROR: Initial state for multiplet is not formatted properly. For instructions on how to format multiplet states, see the GOFISH user manual.")
+        elif init < 1000000:
+          if final >= 10000 and final < 1000000:
+            firstTransitionInit = int((init - (init % 10000))/10000)
+            firstTransitionFinal = int((final - (final % 10000))/10000)
+            secondTransitionInit = int(((init % 10000) - (init % 100))/100)
+            secondTransitionFinal = int(((final % 10000) - (final % 100))/100)
+            thirdTransitionInit = init % 100
+            thirdTransitionFinal = final % 100
+            targetMultipletMap[(firstTransitionInit,firstTransitionFinal)] = (init,final)
+            targetMultipletMap[(secondTransitionInit,secondTransitionFinal)] = (init,final)
+            targetMultipletMap[(thirdTransitionInit,thirdTransitionFinal)] = (init,final)
+          else:
+            raise Exception("ERROR: Initial and final state for multiplets do not indicate the same number of transitions.")
+        elif init < 100000000:
+          if final >= 1000000 and final < 100000000:
+            firstTransitionInit = int((init - (init % 1000000))/1000000)
+            firstTransitionFinal = int((final - (final % 1000000))/1000000)
+            secondTransitionInit = int(((init % 1000000) - (init % 10000))/10000)
+            secondTransitionFinal = int(((final % 1000000) - (final % 10000))/10000)
+            thirdTransitionInit = int(((init % 10000) - (init % 100))/100)
+            thirdTransitionFinal = int(((final % 10000) - (final % 100))/100)
+            fourthTransitionInit = init % 100
+            fourthTransitionFinal = final % 100
+            targetMultipletMap[(firstTransitionInit,firstTransitionFinal)] = (init,final)
+            targetMultipletMap[(secondTransitionInit,secondTransitionFinal)] = (init,final)
+            targetMultipletMap[(thirdTransitionInit,thirdTransitionFinal)] = (init,final)
+            targetMultipletMap[(fourthTransitionInit,fourthTransitionFinal)] = (init,final)
+          else:
+            raise Exception("ERROR: Initial and final state for multiplets do not indicate the same number of transitions.")
+        elif init < 10000000000:
+          if final >= 100000000 and final < 10000000000:
+            firstTransitionInit = int((init - (init % 100000000))/100000000)
+            firstTransitionFinal = int((final - (final % 100000000))/100000000)
+            secondTransitionInit = int(((init % 100000000) - (init % 1000000))/1000000)
+            secondTransitionFinal = int(((final % 100000000) - (final % 1000000))/1000000)
+            thirdTransitionInit = int(((init % 1000000) - (init % 10000))/10000)
+            thirdTransitionFinal = int(((final % 1000000) - (final % 10000))/10000)
+            fourthTransitionInit = int(((init % 10000) - (init % 100))/100)
+            fourthTransitionFinal = int(((final % 10000) - (final % 100))/100)
+            fifthTransitionInit = init % 100
+            fifthTransitionFinal = final % 100
+            targetMultipletMap[(firstTransitionInit,firstTransitionFinal)] = (init,final)
+            targetMultipletMap[(secondTransitionInit,secondTransitionFinal)] = (init,final)
+            targetMultipletMap[(thirdTransitionInit,thirdTransitionFinal)] = (init,final)
+            targetMultipletMap[(fourthTransitionInit,fourthTransitionFinal)] = (init,final)
+            targetMultipletMap[(fifthTransitionInit,fifthTransitionFinal)] = (init,final)
+          else:
+            raise Exception("ERROR: Initial and final states for multiplets do not indicate the same number of transitions.")
+        elif init < 1000000000000:
+          if final >= 10000000000 and final < 1000000000000:
+            firstTransitionInit = int((init - (init % 10000000000))/10000000000)
+            firstTransitionFinal = int((final - (final % 10000000000))/10000000000)
+            secondTransitionInit = int(((init % 10000000000) - (init % 100000000))/100000000)
+            secondTransitionFinal = int(((final % 10000000000) - (final % 100000000))/100000000)
+            thirdTransitionInit = int(((init % 100000000) - (init % 1000000))/1000000)
+            thirdTransitionFinal = int(((final % 100000000) - (final % 1000000))/1000000)
+            fourthTransitionInit = int(((init % 1000000) - (init % 10000))/10000)
+            fourthTransitionFinal = int(((final % 1000000) - (final % 10000))/10000)
+            fifthTransitionInit = int(((init % 10000) - (init % 100))/100)
+            fifthTransitionFinal = int(((final % 10000) - (final % 100))/100)
+            sixthTransitionInit = init % 100
+            sixthTransitionFinal = final % 100
+            targetMultipletMap[(firstTransitionInit,firstTransitionFinal)] = (init,final)
+            targetMultipletMap[(secondTransitionInit,secondTransitionFinal)] = (init,final)
+            targetMultipletMap[(thirdTransitionInit,thirdTransitionFinal)] = (init,final)
+            targetMultipletMap[(fourthTransitionInit,fourthTransitionFinal)] = (init,final)
+            targetMultipletMap[(fifthTransitionInit,fifthTransitionFinal)] = (init,final)
+            targetMultipletMap[(sixthTransitionInit,sixthTransitionFinal)] = (init,final)
+          else:
+            raise Exception("ERROR: Initial and final states for multiplets do not indicate the same number of transitions.")
+        else:
+          raise Exception("ERROR: GOFISH accepts multiplets containing up to 6 transitions at most. One of the provided multiplets indicates 7 or more states.")
+
       f = open(self.configDict["targetYields"],'r')
       line = f.readline()
       while line:
@@ -464,22 +640,23 @@ class gosiaManager:
         elif len(splitline) == 4:
           init = int(splitline[0])
           final = int(splitline[1])
-          targetExptMap.append((expt,int(splitline[0]),int(splitline[1])))
-          """
-          if init >= 10000:
-            secondTransitionInit = ((init % 10000) - (init % 100))/100
-            secondTransitionFinal = ((final % 10000) - (final % 100))/100
-            thirdTransitionInit = init % 100
-            thirdTransitionFinal = final % 100
-            targetTripletMap[(secondTransitionInit,secondTransitionFinal)] = (init,final)
-            targetTripletMap[(thirdTransitionInit,thirdTransitionFinal)] = (init,final)
-          """
-          if init >= 100:
-            secondTransitionInit = init % 100
-            secondTransitionFinal = final % 100
-            targetDoubletMap[(secondTransitionInit,secondTransitionFinal)] = (init,final)
-          observables.append(float(splitline[2]))
-          uncertainties.append(float(splitline[3]))
+          if (init,final) in targetMultipletMap.keys():
+            if (expt,targetMultipletMap[(init,final)][0],targetMultipletMap[(init,final)][1]) not in targetExptMap:
+              targetExptMap.append((expt,targetMultipletMap[(init,final)][0],targetMultipletMap[(init,final)][1]))
+              observables.append(float(splitline[2]))
+              uncertainties.append(float(splitline[3]))
+            else:
+              observableIndex = targetExptMap.index((expt,targetMultipletMap[(init,final)][0],targetMultipletMap[(init,final)][1])) + len(beamExptMap)
+              observables[observableIndex] += float(splitline[2])
+              uncertainties[observableIndex] += float(splitline[3])
+          else:
+            targetExptMap.append((expt,init,final))
+            if init >= 100:
+              secondTransitionInit = init % 100
+              secondTransitionFinal = final % 100
+              targetDoubletMap[(secondTransitionInit,secondTransitionFinal)] = (init,final)
+            observables.append(float(splitline[2]))
+            uncertainties.append(float(splitline[3]))
         line = f.readline()
       f.close()
 
@@ -543,10 +720,10 @@ class gosiaManager:
         line = f.readline()
       f.close()
 
-    return observables,uncertainties,beamExptMap,targetExptMap,beamDoubletMap,targetDoubletMap
+    return observables,uncertainties,beamExptMap,targetExptMap,beamDoubletMap,targetDoubletMap,beamMultipletMap,targetMultipletMap
     
   #Does the same thing as getExperimentalObservables, but for the results simulated in OP,POIN
-  def getPOINobservables(self,output_file,exptMap,doubletMap):
+  def getPOINobservables(self,output_file,exptMap,doubletMap,multipletMap):
     computedObservables = []
     
     f = open(output_file,'r')
@@ -586,7 +763,42 @@ class gosiaManager:
               splitagain = splitline[4].split('+')
               withE = splitagain[0] + "E+" + splitagain[1]
               computedObservables[exptIndex] += float(withE)
-          #If the transition is not the second listed transition in a doublet, we just append the observable to the list.
+          #If this transition is declared as part of a multiplet, we must handle it differently. The mechanics here are similar to doublets,
+          #except that GOSIA does not natively support multiplets so the implementation had to be a little bit more creative.
+          elif (init,final) in multipletMap.keys() or (final,init) in multipletMap.keys():
+            #Get the multiplet "name" from the multipletMap. 
+            try:
+              multiplet = multipletMap[(init,final)]
+            except:
+              multiplet = multipletMap[(final,init)]
+            #Get the index of the observable associated with the multiplet
+            if (expt,multiplet[0],multiplet[1]) in exptMap:
+              exptIndex = exptMap.index((expt,multiplet[0],multiplet[1]))
+            elif (expt,multiplet[1],multiplet[0]) in exptMap:
+              exptIndex = exptMap.index((expt,multiplet[1],multiplet[0]))
+            else:
+              raise Exception("Error in function getPOINobservables: the transition from %i to %i is not in the experiment map." % (init,final))
+            #If the index is exactly equal to the length of the array, this must be the first transition from the multiplet to be listed in the GOSIA output. 
+            #In this case, we simply append the observable for this transition to the observable array. 
+            if exptIndex == len(computedObservables):
+              try:
+                computedObservables.append(float(splitline[4]))
+              except:
+                splitagain = splitline[4].split('+')
+                withE = splitagain[0] + "E+" + splitagain[1]
+                computedObservables.append(float(withE))
+            #If the index is less than the length of the array, we must instead add the counts for this transition to the multiplet observable.
+            elif exptIndex < len(computedObservables):
+              try:
+                computedObservables[exptIndex] += float(splitline[4])
+              except:
+                splitagain = splitline[4].split('+')
+                withE = splitagain[0] + "E+" + splitagain[1]
+                computedObservables[exptIndex] += float(withE)
+            #This case should never happen, and will raise an exception and terminate the program if it does. 
+            else:
+              raise Exception("Error in function getPOINobservables: the index for multiplet state is out of bounds.")
+          #If the transition is not the second listed transition in a doublet or part of a multiplet, we just append the observable to the list.
           else:
             try:
               computedObservables.append(float(splitline[4]))
@@ -631,6 +843,7 @@ class gosiaManager:
           computedObservables.append(float(splitline[3]))
           line = f.readline()
       line = f.readline()
+    f.close()
     return computedObservables
 
   """
@@ -774,6 +987,7 @@ class gosiaManager:
       if "!SCL" in line:
         exptScalingFactors.append(float(line.split("!")[0].strip()))
       line = f.readline()
+    f.close()
     return exptScaledTo, exptScalingFactors
 
   """
@@ -822,16 +1036,80 @@ class gosiaManager:
           line = f.readline()
           averageAngle.append(abs(float(line.split(',')[3])))
       line = f.readline()
-
+    f.close()
     return averageAngle
 
-  def getDsig(self,output_file):
-    f = open(output_file)
-    dsig = []
-    line = f.readline()
-    while line:
-      if "DSIG VALUE" in line:
-        dsig.append(float(line.split("=")[1].split()[0]))
-      line = f.readline()
+#Compute the center of mass scattering angle based on the experiment parameters and the LAB frame particle angle.
+  def getThetaCM(self,thetaLAB,beamA,targetA,beamEnergy,excitationEnergy):
+    tau = (beamA/targetA)/np.sqrt(1-excitationEnergy/beamEnergy*(1+beamA/targetA))
 
+    if np.sin(thetaLAB) > 1.0/tau:
+      thetaLAB = np.arcsin(1.0/tau)
+
+      if(thetaLAB < 0):
+        thetaLAB += np.pi
+    
+    thetaCM = np.arcsin(tau*np.sin(thetaLAB)) + thetaLAB
+
+    return thetaCM
+
+#Compute the LAB frame target recoil angle based on the experimental parameters and the CM scattering angle.
+  def getRecoilThetaLAB(self,thetaCM,beamA,targetA,beamEnergy,excitationEnergy):
+    tau = 1.0/np.sqrt(1-excitationEnergy/beamEnergy*(1+beamA/targetA))
+    tanTheta = np.sin(np.pi-thetaCM)/(np.cos(np.pi-thetaCM)+tau)
+    recoilThetaLAB = np.arctan(tanTheta)
+    return recoilThetaLAB
+
+#Compute DSIG. Credit to Dr. Daniel Rhodes for figuring out how this is calculated so it could be replicated here. 
+  def getDsig(self):
+    f = open(self.configDict["beamPOINinp"],'r')
+    line = f.readline()
+    targetZ = []
+    targetA = []
+    beamEnergy = []
+    averageAngle = []
+    targetDet = []
+    while line:
+      if "LEVE" in line:
+        line = f.readline()
+        line = f.readline()
+        splitline = line.split(',')
+        excitationEnergy = float(splitline[3])
+      elif "EXPT" in line:
+        line = f.readline()
+        splitline = line.split(',')
+        nExpt = int(splitline[0])
+        beamZ = int(splitline[1])
+        beamA = int(splitline[2])
+        for j in range(nExpt):
+          line = f.readline()
+          splitline = line.split(',')
+          targetZ.append(abs(int(splitline[0])))
+          targetA.append(int(splitline[1]))
+          beamEnergy.append(float(splitline[2]))
+          averageAngle.append(abs(float(splitline[3])*np.pi/180.0))
+          if float(splitline[3]) < 0:
+            targetDet.append(True)
+          else:
+            targetDet.append(False)
+        line = False
+      line = f.readline()
+    f.close()
+
+    dsig = []
+    for j in range(nExpt):
+      thetaCM = self.getThetaCM(averageAngle[j],beamA,targetA[j],beamEnergy[j],excitationEnergy)
+      if targetDet[j] == True:
+        zcm = np.pi - thetaCM
+        zlb = self.getRecoilThetaLAB(thetaCM,beamA,targetA[j],beamEnergy[j],excitationEnergy)
+        r3 = 1/((np.sin(zlb)/np.sin(zcm))**2*abs(np.cos(zcm-zlb)))
+      else:
+        r3 = (np.sin(thetaCM)/np.sin(averageAngle[j]))**2/abs(np.cos(thetaCM-averageAngle[j]))
+
+      ared = 1.0 + beamA/targetA[j]
+      dista = 0.0719949*ared*beamZ*targetZ[j]/beamEnergy[j]
+      eps = 1.0/np.sin(thetaCM/2.0)
+
+      dsig.append(250.0*r3*np.sqrt(beamEnergy[j]/(beamEnergy[j]-ared*excitationEnergy))*dista*dista*eps**4)
     return dsig
+

@@ -123,12 +123,12 @@ def getParticleChisq(positions,threadFirstLast,chainDir):
     #Run GOSIA in the appropriate subdirectory, then get the observables from the output file.
     gm.runGosiaInDir(beamPOINinp,chainDir)
     beamOutputFile = os.path.join(chainDir,gm.configDict["beamPOINout"])
-    computedObservables = gm.getPOINobservables(beamOutputFile,beamExptMap,beamDoubletMap)
+    computedObservables = gm.getPOINobservables(beamOutputFile,beamExptMap,beamDoubletMap,beamMultipletMap)
     #Repeat the previous step for the target, if applicable.
     if simulMin == True:
       gm.runGosiaInDir(targetPOINinp,chainDir)
       targetOutputFile = os.path.join(chainDir,gm.configDict["targetPOINout"])
-      computedObservables += gm.getPOINobservables(targetOutputFile,targetExptMap,targetDoubletMap)
+      computedObservables += gm.getPOINobservables(targetOutputFile,targetExptMap,targetDoubletMap,targetMultipletMap)
     #expt stores the GOSIA experiment number associated with each observable. For literature constraints, the experiment number is set to 0.
     expt = []
     for j in range(len(beamExptMap)):
@@ -316,18 +316,18 @@ paramBounds = (loBounds,hiBounds)
 
 #If simulMin is false, we will need some additional information. The getScalingFactors function parses the GOSIA (beam) input file provided to determine which experiments are coupled to one another and what the
 #scaling factors are. This information is stored in the normalizingExpts and normalizingFactors arrays. The normalizing factors need to be scaled to match the computation done in GOSIA, and this requires the DSIG
-#parameter from GOSIA. Due to the difficulty of reading and understanding the GOSIA source code, I was not able to determine how DSIG is computed. Instead, I have included a modified version of gosia which writes
-#the DSIG values to the GOSIA output file, where they can be read by this program. If you are running with simulMin set to False, you will need to run the GOSIA input file once before starting this program so that
-#an output file with the DSIG parameters is available for parsing. 
+#parameter from GOSIA. GOFISH computes DSIG in the same way that GOSIA does, using the getDsig function. Due to the lack of comments in the GOSIA code, I do not fully understand what is being calculated. Thank you 
+#to Dr. Daniel Rhodes for figuring out how DSIG is calculated so that the calculation could be replicated here. 
 if(simulMin == False):
   normalizingExpts,normalizingFactors = gm.getScalingFactors()
-  dsig = gm.getDsig(gm.configDict["beamPOINout"])
+  #dsig = gm.getDsig(gm.configDict["beamPOINout"])
+  dsig = gm.getDsig()
   averageAngle = gm.getAverageAngle()
   for j in range(len(normalizingFactors)):
     normalizingFactors[j] /= (dsig[j]*np.sin(averageAngle[j]*np.pi/180.))
 
 #Get experimental observables and the beam and target maps
-observables,uncertainties,beamExptMap,targetExptMap,beamDoubletMap,targetDoubletMap = gm.getExperimentalObservables()
+observables,uncertainties,beamExptMap,targetExptMap,beamDoubletMap,targetDoubletMap,beamMultipletMap,targetMultipletMap = gm.getExperimentalObservables()
 exptUpperLimits = gm.getUpperLimits(beamExptMap,targetExptMap,observables)
 
 if rank == 0:
